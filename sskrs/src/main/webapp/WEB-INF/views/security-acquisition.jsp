@@ -15,11 +15,11 @@
 	<h1>Software Security Aquisition Utilities</h1>
 	
 	<ul>
-		<li><a href="/sskrs/msp">Manage Software Paradigms</a></li>
-		<li><a href="/sskrs/msa">Manage Subject Areas</a></li>
-		<li><a href="/sskrs/msf">Manage Software Features</a></li>
-		<li><a href="/sskrs/mcp">Manage Construction Practices</a></li>
-		<li><a href="/sskrs/mvp">Manage Verifiction Practices</a></li>		
+		<li><a href="/sskrs/security-acquisition/msp">Manage Software Paradigms</a></li>
+		<li><a href="/sskrs/security-acquisition/msa">Manage Subject Areas</a></li>
+		<li><a href="/sskrs/security-acquisition/msf">Manage Software Features</a></li>
+		<li><a href="/sskrs/security-acquisition/mcp">Manage Construction Practices</a></li>
+		<li><a href="/sskrs/security-acquisition/mvp">Manage Verifiction Practices</a></li>		
 	</ul>
 		
 

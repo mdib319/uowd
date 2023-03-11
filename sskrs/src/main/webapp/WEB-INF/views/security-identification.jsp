@@ -14,7 +14,7 @@
 	<a href="/sskrs/s-scrum-utilities"><img align="middle" src="/sskrs/resources/images/uowd-logo.png" /></a> 
 	<h1>Security Identification Utility</h1>
 	
-	<form action="/sskrs/security-identification" method="post">
+	<form action="/sskrs/s-scrum-utilities/security-identification" method="post">
 		<table>
 			<thead>
 				<tr>

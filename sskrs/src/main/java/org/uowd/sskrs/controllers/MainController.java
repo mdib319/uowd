@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.sql.DataSource;
@@ -27,13 +28,19 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.ModelAndView;
 import org.uowd.sskrs.models.IdentificationRequest;
 import org.uowd.sskrs.models.ImplementationRequest;
+import org.uowd.sskrs.models.SoftwareParadigm;
 import org.uowd.sskrs.models.VerificationRequest;
 
 @Controller
 public class MainController {
+
+	private static final String STATUS = "status";
+	private static final String MESSAGE = "message";
+
 	private static final String KNOWLEDGE_REPOSITORY_PATH = "C:\\owl\\KnowledgeGraph.owl";
 
 	private JdbcTemplate jdbcTemplate;
@@ -44,35 +51,12 @@ public class MainController {
 		this.jdbcTemplate = new JdbcTemplate(dataSource);
 	}
 
-//	public static void main(String args []) throws IOException
-//	{		
-//		String contentToAppend = "\r\n:Travel rdf:type owl:NamedIndividual ,\r\n" + 
-//				"                  :SubjectArea .";
-//	    Files.write(
-//	      Paths.get(KNOWLEDGE_REPOSITORY_PATH), 
-//	      contentToAppend.getBytes(), 
-//	      StandardOpenOption.APPEND);
-//	}
-
 	@GetMapping(path = "/s-scrum-utilities")
 	public ModelAndView sScrumUtilitiesView() {
-		
-		String feature = jdbcTemplate.queryForObject("SELECT * FROM [SSKMS].[dbo].[SOFTWARE_FEATURE] WHERE ID = 1",
-				(rs, rowNum) -> {
-					return rs.getString("DESCRIPTION");
-				});
-		
-		System.out.println(feature);
-
 		return new ModelAndView("s-scrum-utilities");
 	}
 
-	@GetMapping(path = "/security-acquisition")
-	public ModelAndView securityAcquisitionView() {
-		return new ModelAndView("security-acquisition");
-	}
-
-	@RequestMapping(value = "/security-identification", method = { RequestMethod.GET, RequestMethod.POST })
+	@RequestMapping(value = "/s-scrum-utilities/security-identification", method = { RequestMethod.GET, RequestMethod.POST })
 	public ModelAndView securityIdentificationView(HttpServletRequest httpRequest,
 			@ModelAttribute("request") IdentificationRequest request) {
 		ModelAndView mv = new ModelAndView("security-identification");
@@ -210,7 +194,7 @@ public class MainController {
 		return mv;
 	}
 
-	@RequestMapping(value = "/security-implementation", method = { RequestMethod.GET, RequestMethod.POST })
+	@RequestMapping(value = "/s-scrum-utilities/security-implementation", method = { RequestMethod.GET, RequestMethod.POST })
 	public ModelAndView securityImplementationView(HttpServletRequest httpRequest,
 			@ModelAttribute("request") ImplementationRequest request) {
 		ModelAndView mv = new ModelAndView("security-implementation");
@@ -403,7 +387,7 @@ public class MainController {
 		return mv;
 	}
 
-	@RequestMapping(value = "/security-verification", method = { RequestMethod.GET, RequestMethod.POST })
+	@RequestMapping(value = "/s-scrum-utilities/security-verification", method = { RequestMethod.GET, RequestMethod.POST })
 	public ModelAndView securityVerificationView(HttpServletRequest httpRequest,
 			@ModelAttribute("request") VerificationRequest request) {
 		ModelAndView mv = new ModelAndView("security-verification");
@@ -591,27 +575,122 @@ public class MainController {
 		return mv;
 	}
 
-	@GetMapping(path = "/msp")
-	public ModelAndView manageSoftwareParadigmView() {
-		return new ModelAndView("msp");
+	@GetMapping(path = "/security-acquisition")
+	public ModelAndView securityAcquisitionView() {
+		return new ModelAndView("security-acquisition");
+	}
+	
+	@RequestMapping(path = "/security-acquisition/msp", method = {RequestMethod.GET, RequestMethod.POST})
+	public ModelAndView manageSoftwareParadigmView(@ModelAttribute("softwareParadigm") SoftwareParadigm softwareParadigm, 
+			@RequestParam(name = "action", defaultValue = "init", required = false) String action) {
+
+		ModelAndView mnv = new ModelAndView("msp");
+        
+        if(action.contentEquals("add"))
+        {
+        	if (softwareParadigm.getDescription().trim().isEmpty()) 
+    		{
+    			mnv.addObject(STATUS, "0");
+    			mnv.addObject(MESSAGE, "Software Paradigm Name may not be empty.");
+    		}
+    		else
+    		{
+    			int numOfRecords = jdbcTemplate.queryForObject(
+    					"SELECT COUNT(*) AS NUMOFRECORDS FROM [SSKMS].[dbo].[SOFTWARE_PARADIGM] WHERE CAST(DESCRIPTION AS varchar(MAX)) = ?",
+    					(rs, rowNum) -> rs.getInt("NUMOFRECORDS"), softwareParadigm.getDescription());
+
+    			if (numOfRecords > 0) 
+    			{
+    				mnv.addObject(STATUS, "0");
+    				mnv.addObject(MESSAGE, "Software Paradigm '" + softwareParadigm.getDescription() + "' already exists.");
+    			}
+    			else
+    			{
+    				int rows = jdbcTemplate.update("INSERT INTO [dbo].[SOFTWARE_PARADIGM] ([DESCRIPTION]) VALUES (?)", softwareParadigm.getDescription());
+
+    				if (rows == 1)
+    				{
+    					mnv.addObject(STATUS, "1");
+    					mnv.addObject(MESSAGE,
+    							"Software Paradigm '" + softwareParadigm.getDescription() + "' added successfully.");
+    				}
+    				else
+    				{
+    					mnv.addObject(STATUS, "0");
+    					mnv.addObject(MESSAGE,
+    							"Error occurred while adding Software Paradigm '" + softwareParadigm.getDescription() + "'.");
+    				}
+    			}
+    		}
+        }
+        else if(action.contentEquals("delete"))
+        {
+        	if(softwareParadigm.getId() == -1)
+        	{
+        		mnv.addObject(STATUS, "0");
+    			mnv.addObject(MESSAGE, "Software Paradigm Id is not valid.");
+        	}
+        	else
+        	{
+        		int numOfRecords = jdbcTemplate.queryForObject(
+    					"SELECT COUNT(*) AS 'NUM OF SOFTWARE FEATURES' FROM SOFTWARE_FEATURE AS SF INNER JOIN SOFTWARE_PARADIGM_HAS_SOFTWARE_FEATURE AS SPHSF ON SPHSF.SOFTWARE_FEATURE_ID = SF.ID WHERE SPHSF.SOFTWARE_PARADIGM_ID = ?",
+    					(rs, rowNum) -> rs.getInt("NUM OF SOFTWARE FEATURES"), softwareParadigm.getId());
+
+    			if (numOfRecords > 0) 
+    			{
+    				mnv.addObject(STATUS, "0");
+    				mnv.addObject(MESSAGE, "Software Paradigm '" + softwareParadigm.getDescription() + "' has " + numOfRecords + " Software Feature(s) linked to it.");
+    			}
+    			else
+    			{
+	        		int rows = jdbcTemplate.update("DELETE FROM [dbo].[SOFTWARE_PARADIGM] WHERE ID = ?", softwareParadigm.getId());
+	
+					if (rows == 1)
+					{
+						mnv.addObject(STATUS, "1");
+						mnv.addObject(MESSAGE,
+								"Software Paradigm '" + softwareParadigm.getDescription() + "' deleted successfully.");
+					}
+					else
+					{
+						mnv.addObject(STATUS, "0");
+						mnv.addObject(MESSAGE,
+								"Error occurred while deleting Software Paradigm '" + softwareParadigm.getDescription() + "'.");
+					}
+    			}
+        	}
+        }
+        
+        mnv.addObject("softwareParadigm", new SoftwareParadigm());
+        
+        List<Map<String,Object>> list = jdbcTemplate.queryForList("SELECT [ID], [DESCRIPTION] FROM [SSKMS].[dbo].[SOFTWARE_PARADIGM]");        
+        List<SoftwareParadigm> spList = new ArrayList<>();        
+        list.forEach(m -> {               
+        	SoftwareParadigm sp = new SoftwareParadigm((int) m.get("ID"), (String) m.get("DESCRIPTION"));
+        	spList.add(sp);               
+        });
+        
+        mnv.addObject("softwareParadigmList", spList);
+
+		return mnv;
 	}
 
-	@GetMapping(path = "/msa")
+	@GetMapping(path = "/security-acquisition/msa")
 	public ModelAndView manageSubjectAreaView() {
 		return new ModelAndView("msa");
 	}
 
-	@GetMapping(path = "/msf")
+	@GetMapping(path = "/security-acquisition/msf")
 	public ModelAndView manageSoftwareFeatureView() {
 		return new ModelAndView("msf");
 	}
 
-	@GetMapping(path = "/mcp")
+	@GetMapping(path = "/security-acquisition/mcp")
 	public ModelAndView manageContructionPracticeView() {
 		return new ModelAndView("mcp");
 	}
 
-	@GetMapping(path = "/mvp")
+	@GetMapping(path = "/security-acquisition/mvp")
 	public ModelAndView manageVerificationPracticeView() {
 		return new ModelAndView("mvp");
 	}

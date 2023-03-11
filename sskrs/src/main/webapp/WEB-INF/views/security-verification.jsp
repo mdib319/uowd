@@ -13,7 +13,7 @@
 	<a href="/sskrs/s-scrum-utilities"><img align="middle" src="/sskrs/resources/images/uowd-logo.png" /></a> 
 	<h1>Security Verification Utility</h1>
 	
-	<form action="/sskrs/security-verification" method="post">
+	<form action="/sskrs/s-scrum-utilities/security-verification" method="post">
 		<table>
 			<thead>
 				<tr>

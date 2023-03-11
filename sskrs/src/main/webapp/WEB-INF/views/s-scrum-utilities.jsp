@@ -4,9 +4,9 @@
 	<h1>S-Scrum Security Utilities</h1>
 	
 	<ul>
-		<li><a href="/sskrs/security-identification">Security Identification Utility</a></li>
-		<li><a href="/sskrs/security-implementation">Security Implementation Utility</a></li>
-		<li><a href="/sskrs/security-verification">Security Verification Utility</a></li>
+		<li><a href="/sskrs/s-scrum-utilities/security-identification">Security Identification Utility</a></li>
+		<li><a href="/sskrs/s-scrum-utilities/security-implementation">Security Implementation Utility</a></li>
+		<li><a href="/sskrs/s-scrum-utilities/security-verification">Security Verification Utility</a></li>
 	</ul>
 </body>
 </html>
