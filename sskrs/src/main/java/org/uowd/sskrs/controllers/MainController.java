@@ -24,6 +24,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Controller;
+import org.springframework.ui.ModelMap;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -32,7 +33,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.ModelAndView;
 import org.uowd.sskrs.models.IdentificationRequest;
 import org.uowd.sskrs.models.ImplementationRequest;
+import org.uowd.sskrs.models.SoftwareFeature;
 import org.uowd.sskrs.models.SoftwareParadigm;
+import org.uowd.sskrs.models.SubjectArea;
 import org.uowd.sskrs.models.VerificationRequest;
 
 @Controller
@@ -675,14 +678,393 @@ public class MainController {
 		return mnv;
 	}
 
-	@GetMapping(path = "/security-acquisition/msa")
-	public ModelAndView manageSubjectAreaView() {
-		return new ModelAndView("msa");
+	@RequestMapping(path = "/security-acquisition/msa", method = {RequestMethod.GET, RequestMethod.POST})
+	public ModelAndView manageSubjectAreaView(@ModelAttribute("subjectArea") SubjectArea subjectArea, 
+			@RequestParam(name = "action", defaultValue = "init", required = false) String action) {
+		
+		ModelAndView mnv = new ModelAndView("msa");
+		
+		if(action.contentEquals("add"))
+        {
+        	if (subjectArea.getDescription().trim().isEmpty()) 
+    		{
+    			mnv.addObject(STATUS, "0");
+    			mnv.addObject(MESSAGE, "Subject Area Name may not be empty.");
+    		}
+    		else
+    		{
+    			int numOfRecords = jdbcTemplate.queryForObject(
+    					"SELECT COUNT(*) AS NUMOFRECORDS FROM [SSKMS].[dbo].[SUBJECT_AREA] WHERE CAST(DESCRIPTION AS varchar(MAX)) = ?",
+    					(rs, rowNum) -> rs.getInt("NUMOFRECORDS"), subjectArea.getDescription());
+
+    			if (numOfRecords > 0) 
+    			{
+    				mnv.addObject(STATUS, "0");
+    				mnv.addObject(MESSAGE, "Subject Area '" + subjectArea.getDescription() + "' already exists.");
+    			}
+    			else
+    			{
+    				int rows = jdbcTemplate.update("INSERT INTO [dbo].[SUBJECT_AREA] ([DESCRIPTION]) VALUES (?)", subjectArea.getDescription());
+
+    				if (rows == 1)
+    				{
+    					mnv.addObject(STATUS, "1");
+    					mnv.addObject(MESSAGE,
+    							"Subject Area '" + subjectArea.getDescription() + "' added successfully.");
+    				}
+    				else
+    				{
+    					mnv.addObject(STATUS, "0");
+    					mnv.addObject(MESSAGE,
+    							"Error occurred while adding Subject Area '" + subjectArea.getDescription() + "'.");
+    				}
+    			}
+    		}
+        }
+        else if(action.contentEquals("delete"))
+        {
+        	if(subjectArea.getId() == -1)
+        	{
+        		mnv.addObject(STATUS, "0");
+    			mnv.addObject(MESSAGE, "Subject Area Id is not valid.");
+        	}
+        	else
+        	{
+        		int numOfRecords = jdbcTemplate.queryForObject(
+    					"SELECT COUNT(*) AS 'NUM OF SOFTWARE FEATURES' FROM SOFTWARE_FEATURE AS SF INNER JOIN SUBJECT_AREA_HAS_SOFTWARE_FEATURE AS SAHSF ON SAHSF.SOFTWARE_FEATURE_ID = SF.ID WHERE SAHSF.SUBJECT_AREA_ID = ?",
+    					(rs, rowNum) -> rs.getInt("NUM OF SOFTWARE FEATURES"), subjectArea.getId());
+
+    			if (numOfRecords > 0) 
+    			{
+    				mnv.addObject(STATUS, "0");
+    				mnv.addObject(MESSAGE, "Subject Area '" + subjectArea.getDescription() + "' has " + numOfRecords + " Software Feature(s) linked to it.");
+    			}
+    			else
+    			{
+	        		int rows = jdbcTemplate.update("DELETE FROM [dbo].[SUBJECT_AREA] WHERE ID = ?", subjectArea.getId());
+	
+					if (rows == 1)
+					{
+						mnv.addObject(STATUS, "1");
+						mnv.addObject(MESSAGE,
+								"Subject Area '" + subjectArea.getDescription() + "' deleted successfully.");
+					}
+					else
+					{
+						mnv.addObject(STATUS, "0");
+						mnv.addObject(MESSAGE,
+								"Error occurred while deleting Subject Area '" + subjectArea.getDescription() + "'.");
+					}
+    			}
+        	}
+        }
+        
+        mnv.addObject("subjectArea", new SubjectArea());
+        
+        List<Map<String,Object>> list = jdbcTemplate.queryForList("SELECT [ID], [DESCRIPTION] FROM [SSKMS].[dbo].[SUBJECT_AREA]");        
+        List<SubjectArea> saList = new ArrayList<>();        
+        list.forEach(m -> {               
+        	SubjectArea sa = new SubjectArea((int) m.get("ID"), (String) m.get("DESCRIPTION"));
+        	saList.add(sa);
+        });
+        
+        mnv.addObject("subjectAreaList", saList);
+		
+		return mnv;
 	}
 
-	@GetMapping(path = "/security-acquisition/msf")
-	public ModelAndView manageSoftwareFeatureView() {
-		return new ModelAndView("msf");
+	@RequestMapping(path = "/security-acquisition/msf", method = {RequestMethod.GET, RequestMethod.POST})
+	public ModelAndView manageSoftwareFeatureView(@ModelAttribute("softwareFeature") SoftwareFeature softwareFeature, 
+			@RequestParam(name = "action", defaultValue = "init", required = false) String action) {
+		ModelAndView mnv = new ModelAndView("msf");
+		
+		if(action.contentEquals("add"))
+        {
+        	if (softwareFeature.getDescription().trim().isEmpty()) 
+    		{
+    			mnv.addObject(STATUS, "0");
+    			mnv.addObject(MESSAGE, "Software Feature Name may not be empty.");
+    		}
+    		else
+    		{
+    			if(softwareFeature.getSoftwareParadigmId().trim().isEmpty() || softwareFeature.getSoftwareParadigmId().contentEquals("-1"))
+    			{
+    				mnv.addObject(STATUS, "0");
+        			mnv.addObject(MESSAGE, "Software Paradigm should be selected.");
+    			}
+    			else
+    			{
+    				if(softwareFeature.getSubjectAreaId().trim().isEmpty() || softwareFeature.getSubjectAreaId().contentEquals("-1"))
+    				{
+    					mnv.addObject(STATUS, "0");
+            			mnv.addObject(MESSAGE, "Subject Area should be selected.");
+    				}
+    				else
+    				{
+		    			int numOfRecords = jdbcTemplate.queryForObject(
+		    					"SELECT COUNT(*) AS NUMOFRECORDS FROM [SSKMS].[dbo].[SOFTWARE_FEATURE] WHERE CAST(DESCRIPTION AS varchar(MAX)) = ?",
+		    					(rs, rowNum) -> rs.getInt("NUMOFRECORDS"), softwareFeature.getDescription());
+		
+		    			if (numOfRecords > 0) 
+		    			{
+		    				mnv.addObject(STATUS, "0");
+		    				mnv.addObject(MESSAGE, "Software Feature '" + softwareFeature.getDescription() + "' already exists.");
+		    			}
+		    			else
+		    			{
+		    				int rows = jdbcTemplate.update("INSERT INTO [dbo].[SOFTWARE_FEATURE] ([DESCRIPTION]) VALUES (?)", softwareFeature.getDescription());
+		
+		    				if (rows == 1)
+		    				{
+		    					try
+		    					{
+			    					int softwareFeatureId = jdbcTemplate.queryForObject("SELECT ID FROM [dbo].[SOFTWARE_FEATURE] WHERE CAST(DESCRIPTION AS varchar(MAX)) = ?", Integer.class, softwareFeature.getDescription());
+			    					
+			    					rows = jdbcTemplate.update("INSERT INTO [dbo].[SOFTWARE_PARADIGM_HAS_SOFTWARE_FEATURE] ([SOFTWARE_PARADIGM_ID] ,[SOFTWARE_FEATURE_ID]) VALUES (?, ?)", 
+			    							Integer.parseInt(softwareFeature.getSoftwareParadigmId()), softwareFeatureId);
+			    					
+			    					if(rows == 1)
+			    					{
+			    						rows = jdbcTemplate.update("INSERT INTO [dbo].[SUBJECT_AREA_HAS_SOFTWARE_FEATURE] ([SUBJECT_AREA_ID] ,[SOFTWARE_FEATURE_ID]) VALUES (?, ?)", 
+				    							Integer.parseInt(softwareFeature.getSubjectAreaId()), softwareFeatureId);
+				    					
+			    						if(rows == 1)
+			    						{
+					    					mnv.addObject(STATUS, "1");
+					    					mnv.addObject(MESSAGE,
+					    							"Software Feature '" + softwareFeature.getDescription() + "' added successfully.");
+			    						}
+			    						else
+			    						{
+			    							mnv.addObject(STATUS, "0");
+					    					mnv.addObject(MESSAGE,
+					    							"Error occurred (4) while adding Software Feature '" + softwareFeature.getDescription() + "'.");
+			    						}
+			    					}
+			    					else
+			    					{
+			    						mnv.addObject(STATUS, "0");
+				    					mnv.addObject(MESSAGE,
+				    							"Error occurred (3) while adding Software Feature '" + softwareFeature.getDescription() + "'.");
+			    					}
+		    					}
+		    					catch(Exception ex)
+		    					{
+		    						mnv.addObject(STATUS, "0");
+			    					mnv.addObject(MESSAGE,
+			    							"Error occurred (2) while adding Software Feature '" + softwareFeature.getDescription() + "'.");
+		    					}
+		    				}
+		    				else
+		    				{
+		    					mnv.addObject(STATUS, "0");
+		    					mnv.addObject(MESSAGE,
+		    							"Error occurred (1) while adding Software Feature '" + softwareFeature.getDescription() + "'.");
+		    				}
+		    			}
+    				}
+    			}
+    		}
+        }
+        else if(action.contentEquals("delete"))
+        {
+        	if(softwareFeature.getId() == -1)
+        	{
+        		mnv.addObject(STATUS, "0");
+    			mnv.addObject(MESSAGE, "Software Feature Id is not valid.");
+        	}
+        	else
+        	{
+        		int numOfRecords = jdbcTemplate.queryForObject(
+        				"SELECT COUNT(*) AS 'NUM OF SOFTWARE FEATURES' " 
+        				+ "FROM SOFTWARE_FEATURE_HAS_SECURITY_REQUIREMENT AS SFHSR "
+        				+ "WHERE SFHSR.SOFTWARE_FEATURE_ID = ?",
+    					(rs, rowNum) -> rs.getInt("NUM OF SOFTWARE FEATURES"), softwareFeature.getId());
+
+    			if (numOfRecords > 0) 
+    			{
+    				mnv.addObject(STATUS, "0");
+    				mnv.addObject(MESSAGE, "Software Feature '" + softwareFeature.getDescription() + "' has " + numOfRecords + " Security Requirement(s) linked to it.");
+    			}
+    			else
+    			{
+    				numOfRecords = jdbcTemplate.queryForObject(
+            				"SELECT COUNT(*) AS 'NUM OF SOFTWARE FEATURES' " 
+            				+ "FROM SOFTWARE_FEATURE_HAS_CONSTRUCTION_PRACTICE AS SFHCP "
+            				+ "WHERE SFHCP.SOFTWARE_FEATURE_ID = ?",
+        					(rs, rowNum) -> rs.getInt("NUM OF SOFTWARE FEATURES"), softwareFeature.getId());
+
+        			if (numOfRecords > 0) 
+        			{
+        				mnv.addObject(STATUS, "0");
+        				mnv.addObject(MESSAGE, "Software Feature '" + softwareFeature.getDescription() + "' has " + numOfRecords + " Construction Practice(s) linked to it.");
+        			}
+    				else
+    				{
+    					jdbcTemplate.update("DELETE FROM SOFTWARE_PARADIGM_HAS_SOFTWARE_FEATURE WHERE SOFTWARE_FEATURE_ID = ?", softwareFeature.getId());
+    					jdbcTemplate.update("DELETE FROM SUBJECT_AREA_HAS_SOFTWARE_FEATURE WHERE SOFTWARE_FEATURE_ID = ?", softwareFeature.getId());    					
+		        		
+    					
+    					int rows = jdbcTemplate.update("DELETE FROM [dbo].[SOFTWARE_FEATURE] WHERE ID = ?", softwareFeature.getId());
+		
+						if (rows == 1)
+						{
+							mnv.addObject(STATUS, "1");
+							mnv.addObject(MESSAGE,
+									"Software Feature '" + softwareFeature.getDescription() + "' deleted successfully.");
+						}
+						else
+						{
+							mnv.addObject(STATUS, "0");
+							mnv.addObject(MESSAGE,
+									"Error occurred while deleting Software Feature '" + softwareFeature.getDescription() + "'.");
+						}
+    				}
+    			}
+        	}
+        }
+        else if(action.contentEquals("edit"))
+        {
+        	if (softwareFeature.getDescription().trim().isEmpty()) 
+    		{
+    			mnv.addObject(STATUS, "0");
+    			mnv.addObject(MESSAGE, "Software Feature Name may not be empty.");
+    		}
+    		else
+    		{
+    			if(softwareFeature.getSoftwareParadigmId().trim().isEmpty() || softwareFeature.getSoftwareParadigmId().contentEquals("-1"))
+    			{
+    				mnv.addObject(STATUS, "0");
+        			mnv.addObject(MESSAGE, "Software Paradigm should be selected.");
+    			}
+    			else
+    			{
+    				if(softwareFeature.getSubjectAreaId().trim().isEmpty() || softwareFeature.getSubjectAreaId().contentEquals("-1"))
+    				{
+    					mnv.addObject(STATUS, "0");
+            			mnv.addObject(MESSAGE, "Subject Area should be selected.");
+    				}
+    				else
+    				{
+		    			int numOfRecords = jdbcTemplate.queryForObject(
+		    					"SELECT COUNT(*) AS NUMOFRECORDS FROM [SSKMS].[dbo].[SOFTWARE_FEATURE] WHERE CAST(DESCRIPTION AS varchar(MAX)) = ? AND ID <> ?",
+		    					(rs, rowNum) -> rs.getInt("NUMOFRECORDS"), softwareFeature.getDescription(), softwareFeature.getId());
+		
+		    			if (numOfRecords > 0) 
+		    			{
+		    				mnv.addObject(STATUS, "0");
+		    				mnv.addObject(MESSAGE, "Software Feature '" + softwareFeature.getDescription() + "' is duplicate.");
+		    			}
+		    			else
+		    			{
+		    				int rows = jdbcTemplate.update("UPDATE [dbo].[SOFTWARE_FEATURE] SET [DESCRIPTION] = ? WHERE ID = ?", softwareFeature.getDescription(), softwareFeature.getId());
+		
+		    				if (rows == 1)
+		    				{
+		    					try
+		    					{
+		    						jdbcTemplate.update("DELETE FROM [dbo].[SOFTWARE_PARADIGM_HAS_SOFTWARE_FEATURE] WHERE SOFTWARE_FEATURE_ID = ?", softwareFeature.getId());
+		    						
+		    						jdbcTemplate.update("DELETE FROM [dbo].[SUBJECT_AREA_HAS_SOFTWARE_FEATURE] WHERE SOFTWARE_FEATURE_ID = ?", softwareFeature.getId());
+		    						
+			    					rows = jdbcTemplate.update("INSERT INTO [dbo].[SOFTWARE_PARADIGM_HAS_SOFTWARE_FEATURE] ([SOFTWARE_PARADIGM_ID] ,[SOFTWARE_FEATURE_ID]) VALUES (?, ?)", 
+			    							Integer.parseInt(softwareFeature.getSoftwareParadigmId()), softwareFeature.getId());
+			    					
+			    					if(rows == 1)
+			    					{
+			    						rows = jdbcTemplate.update("INSERT INTO [dbo].[SUBJECT_AREA_HAS_SOFTWARE_FEATURE] ([SUBJECT_AREA_ID], [SOFTWARE_FEATURE_ID]) VALUES (?, ?)", 
+				    							Integer.parseInt(softwareFeature.getSubjectAreaId()), softwareFeature.getId());
+				    					
+			    						if(rows == 1)
+			    						{
+			    							mnv.addObject(STATUS, "1");
+			    							mnv.addObject(MESSAGE,
+					    							"Software Feature '" + softwareFeature.getDescription() + "' edited successfully.");
+			    						}
+			    						else
+			    						{
+			    							mnv.addObject(STATUS, "0");
+					    					mnv.addObject(MESSAGE,
+					    							"Error occurred (4) while editing Software Feature '" + softwareFeature.getDescription() + "'.");
+			    						}
+			    					}
+			    					else
+			    					{
+			    						mnv.addObject(STATUS, "0");
+				    					mnv.addObject(MESSAGE,
+				    							"Error occurred (3) while editing Software Feature '" + softwareFeature.getDescription() + "'.");
+			    					}
+		    					}
+		    					catch(Exception ex)
+		    					{
+		    						ex.printStackTrace();
+		    						
+		    						mnv.addObject(STATUS, "0");
+			    					mnv.addObject(MESSAGE,
+			    							"Error occurred (2) while editing Software Feature '" + softwareFeature.getDescription() + "'.");
+		    					}
+		    				}
+		    				else
+		    				{
+		    					mnv.addObject(STATUS, "0");
+		    					mnv.addObject(MESSAGE,
+		    							"Error occurred (1) while editing Software Feature '" + softwareFeature.getDescription() + "'.");
+		    				}
+		    			}
+    				}
+    			}
+    		}
+        }
+        
+        if(!action.contentEquals("initEdit") && !action.contentEquals("edit"))
+        {
+        	mnv.addObject("softwareFeature", new SoftwareFeature());
+        }
+        
+        List<Map<String, Object>> list = jdbcTemplate.queryForList("SELECT SF.ID AS 'SOFTWARE FEATURE ID', SF.DESCRIPTION AS 'SOFTWARE FEATURE DESCRIPTION', "
+        		+ "SP.ID AS 'SOFTWARE PARADIGM ID', SP.DESCRIPTION AS 'SOFTWARE PARADIGM DESCRIPTION', "
+        		+ "SA.ID AS 'SUBJECT AREA ID', SA.DESCRIPTION AS 'SUBJECT AREA DESCRIPTION' "
+        		+ "FROM [SSKMS].[dbo].[SOFTWARE_FEATURE] AS SF "
+        		+ "INNER JOIN SOFTWARE_PARADIGM_HAS_SOFTWARE_FEATURE AS SPHSF ON SPHSF.SOFTWARE_FEATURE_ID = SF.ID "
+        		+ "INNER JOIN SOFTWARE_PARADIGM AS SP ON SP.ID = SPHSF.SOFTWARE_PARADIGM_ID "
+        		+ "INNER JOIN SUBJECT_AREA_HAS_SOFTWARE_FEATURE AS SAHSF ON SAHSF.SOFTWARE_FEATURE_ID = SF.ID "
+        		+ "INNER JOIN SUBJECT_AREA AS SA ON SA.ID = SAHSF.SUBJECT_AREA_ID "
+        		+ "ORDER BY CAST(SF.DESCRIPTION AS VARCHAR(MAX)), CAST(SP.DESCRIPTION AS VARCHAR(MAX)), CAST(SA.DESCRIPTION AS VARCHAR(MAX)) ASC");
+        
+        List<SoftwareFeature> sfList = new ArrayList<>();        
+        list.forEach(m -> {               
+        	SoftwareFeature sf = new SoftwareFeature((int) m.get("SOFTWARE FEATURE ID"), (String) m.get("SOFTWARE FEATURE DESCRIPTION"),
+        			"" + (int) m.get("SOFTWARE PARADIGM ID"), (String) m.get("SOFTWARE PARADIGM DESCRIPTION"),
+        			"" + (int) m.get("SUBJECT AREA ID"), (String) m.get("SUBJECT AREA DESCRIPTION"));
+        	
+        	sfList.add(sf);
+        });
+        
+        mnv.addObject("softwareFeatureList", sfList);
+        
+        list = jdbcTemplate.queryForList("SELECT * FROM SOFTWARE_PARADIGM");
+        
+        List<SoftwareParadigm> spList = new ArrayList<>();
+        list.forEach(m -> {
+        	SoftwareParadigm sp = new SoftwareParadigm((int) m.get("ID"), (String) m.get("DESCRIPTION"));
+        	
+        	spList.add(sp);
+        });
+		
+        mnv.addObject("softwareParadigmList", spList);
+        
+        list = jdbcTemplate.queryForList("SELECT * FROM SUBJECT_AREA");
+        
+        List<SubjectArea> saList = new ArrayList<>();
+        list.forEach(m -> {
+        	SubjectArea sa = new SubjectArea((int) m.get("ID"), (String) m.get("DESCRIPTION"));
+        	
+        	saList.add(sa);
+        });
+		
+        mnv.addObject("subjectAreaList", saList);
+        
+		return mnv;
 	}
 
 	@GetMapping(path = "/security-acquisition/mcp")
