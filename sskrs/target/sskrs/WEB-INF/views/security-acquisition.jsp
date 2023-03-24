@@ -17,9 +17,10 @@
 	<ul>
 		<li><a href="/sskrs/security-acquisition/msp">Manage Software Paradigms</a></li>
 		<li><a href="/sskrs/security-acquisition/msa">Manage Subject Areas</a></li>
-		<li><a href="/sskrs/security-acquisition/msf">Manage Software Features</a></li>
+		<li><a href="/sskrs/security-acquisition/msf?action=init">Manage Software Features</a></li>
+		<li><a href="/sskrs/security-acquisition/msr">Manage Security Requirements</a></li>
 		<li><a href="/sskrs/security-acquisition/mcp">Manage Construction Practices</a></li>
-		<li><a href="/sskrs/security-acquisition/mvp">Manage Verifiction Practices</a></li>		
+		<li><a href="/sskrs/security-acquisition/mvp">Manage Verification Practices</a></li>
 	</ul>
 		
 

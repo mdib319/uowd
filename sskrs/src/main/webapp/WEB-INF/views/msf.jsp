@@ -11,13 +11,13 @@
 <meta charset="UTF-8">
 <link rel="stylesheet" href="/sskrs/resources/css/all.css" />
 <script src="/sskrs/resources/js/jquery-3.6.0.min.js"></script>
-<title>Manage Software Feature</title>
+<title>Manage Software Features</title>
 </head>
 <body style="background-color: #E6E6FA;">
 
 	<a href="/sskrs/security-acquisition"><img align="middle"
 		src="/sskrs/resources/images/uowd-logo.png" /></a>
-	<h1>Manage Software Feature</h1>
+	<h1>Manage Software Features</h1>
 	
 	<div style="margin-bottom: 10px;">
 		<c:choose>

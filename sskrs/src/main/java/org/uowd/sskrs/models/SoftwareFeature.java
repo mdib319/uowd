@@ -19,6 +19,17 @@ public class SoftwareFeature {
 		this.subjectAreaId = "-1";
 		this.subjectAreaIdDescription = "";
 	}
+	
+	public SoftwareFeature(int id, String description)
+	{
+		super();
+		this.id = id;
+		this.description = description;
+		this.softwareParadigmId = "-1";
+		this.softwareParadigmDescription = "";
+		this.subjectAreaId = "-1";
+		this.subjectAreaIdDescription = "";
+	}
 
 	public SoftwareFeature(int id, String description, 
 			String softwareParadigmId, String softwareParadigmDescription, 

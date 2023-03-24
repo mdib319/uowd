@@ -11,13 +11,13 @@
 <meta charset="UTF-8">
 <link rel="stylesheet" href="/sskrs/resources/css/all.css" />
 <script src="/sskrs/resources/js/jquery-3.6.0.min.js"></script>
-<title>Manage Subject Area</title>
+<title>Manage Subject Areas</title>
 </head>
 <body style="background-color: #E6E6FA;">
 
 	<a href="/sskrs/security-acquisition"><img align="middle"
 		src="/sskrs/resources/images/uowd-logo.png" /></a>
-	<h1>Manage Subject Area</h1>
+	<h1>Manage Subject Areas</h1>
 	
 	<div style="margin-bottom: 10px;">
 		<c:choose>

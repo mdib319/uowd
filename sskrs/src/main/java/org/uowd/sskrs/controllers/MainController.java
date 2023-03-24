@@ -24,7 +24,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Controller;
-import org.springframework.ui.ModelMap;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -33,6 +32,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.ModelAndView;
 import org.uowd.sskrs.models.IdentificationRequest;
 import org.uowd.sskrs.models.ImplementationRequest;
+import org.uowd.sskrs.models.SecurityRequirement;
 import org.uowd.sskrs.models.SoftwareFeature;
 import org.uowd.sskrs.models.SoftwareParadigm;
 import org.uowd.sskrs.models.SubjectArea;
@@ -1064,6 +1064,122 @@ public class MainController {
 		
         mnv.addObject("subjectAreaList", saList);
         
+		return mnv;
+	}
+	
+	@RequestMapping(path = "/security-acquisition/msr", method = {RequestMethod.GET, RequestMethod.POST})
+	public ModelAndView manageSecurityRequirementView(@ModelAttribute("softwareFeature") SoftwareFeature softwareFeature, HttpServletRequest request) {
+		ModelAndView mnv = new ModelAndView("msr");
+		
+		if (request.getMethod().equals(RequestMethod.POST.name())) {
+			
+			List<Map<String, Object>> list = jdbcTemplate.queryForList("SELECT SF.ID AS 'SOFTWARE FEATURE ID', SF.DESCRIPTION AS 'SOFTWARE FEATURE DESCRIPTION', "
+	        		+ "SP.ID AS 'SOFTWARE PARADIGM ID', SP.DESCRIPTION AS 'SOFTWARE PARADIGM DESCRIPTION', "
+	        		+ "SA.ID AS 'SUBJECT AREA ID', SA.DESCRIPTION AS 'SUBJECT AREA DESCRIPTION' "
+	        		+ "FROM [SSKMS].[dbo].[SOFTWARE_FEATURE] AS SF "
+	        		+ "INNER JOIN SOFTWARE_PARADIGM_HAS_SOFTWARE_FEATURE AS SPHSF ON SPHSF.SOFTWARE_FEATURE_ID = SF.ID "
+	        		+ "INNER JOIN SOFTWARE_PARADIGM AS SP ON SP.ID = SPHSF.SOFTWARE_PARADIGM_ID "
+	        		+ "INNER JOIN SUBJECT_AREA_HAS_SOFTWARE_FEATURE AS SAHSF ON SAHSF.SOFTWARE_FEATURE_ID = SF.ID "
+	        		+ "INNER JOIN SUBJECT_AREA AS SA ON SA.ID = SAHSF.SUBJECT_AREA_ID "
+	        		+ "WHERE SP.ID = ? AND SA.ID = ? "
+	        		+ "ORDER BY CAST(SF.DESCRIPTION AS VARCHAR(MAX)), CAST(SP.DESCRIPTION AS VARCHAR(MAX)), CAST(SA.DESCRIPTION AS VARCHAR(MAX)) ASC"
+	        		, softwareFeature.getSoftwareParadigmId(), softwareFeature.getSubjectAreaId());
+	        
+	        List<SoftwareFeature> sfList = new ArrayList<>();        
+	        list.forEach(m -> {               
+	        	SoftwareFeature sf = new SoftwareFeature((int) m.get("SOFTWARE FEATURE ID"), (String) m.get("SOFTWARE FEATURE DESCRIPTION"),
+	        			"" + (int) m.get("SOFTWARE PARADIGM ID"), (String) m.get("SOFTWARE PARADIGM DESCRIPTION"),
+	        			"" + (int) m.get("SUBJECT AREA ID"), (String) m.get("SUBJECT AREA DESCRIPTION"));
+	        	
+	        	sfList.add(sf);
+	        });
+			
+			mnv.addObject("result", sfList);
+		}
+		
+		List<Map<String, Object>> list = jdbcTemplate.queryForList("SELECT * FROM SOFTWARE_PARADIGM");
+        
+        List<SoftwareParadigm> spList = new ArrayList<>();
+        list.forEach(m -> {
+        	SoftwareParadigm sp = new SoftwareParadigm((int) m.get("ID"), (String) m.get("DESCRIPTION"));
+        	
+        	spList.add(sp);
+        });
+		
+        mnv.addObject("softwareParadigmList", spList);
+        
+        list = jdbcTemplate.queryForList("SELECT * FROM SUBJECT_AREA");
+        
+        List<SubjectArea> saList = new ArrayList<>();
+        list.forEach(m -> {
+        	SubjectArea sa = new SubjectArea((int) m.get("ID"), (String) m.get("DESCRIPTION"));
+        	
+        	saList.add(sa);
+        });
+		
+        mnv.addObject("subjectAreaList", saList);
+		
+		return mnv;
+	}
+	
+	@RequestMapping(path = "/security-acquisition/msr/manage", method = {RequestMethod.POST})
+	public ModelAndView manageSoftwareFeatureSecurityRequirementView(@ModelAttribute("softwareFeature") SoftwareFeature softwareFeature) {
+		ModelAndView mnv = new ModelAndView("msr-manage");
+		
+		
+		
+		SoftwareParadigm sp = jdbcTemplate.queryForObject("SELECT [ID],[DESCRIPTION] FROM [SSKMS].[dbo].[SOFTWARE_PARADIGM] WHERE ID = ?", (rs, rowNum) -> new SoftwareParadigm(rs.getInt("ID"), rs.getString("DESCRIPTION")), Integer.parseInt(softwareFeature.getSoftwareParadigmId()));
+		SubjectArea sa = jdbcTemplate.queryForObject("SELECT [ID],[DESCRIPTION] FROM [SSKMS].[dbo].[SUBJECT_AREA] WHERE ID = ?", (rs, rowNum) -> new SubjectArea(rs.getInt("ID"), rs.getString("DESCRIPTION")), Integer.parseInt(softwareFeature.getSubjectAreaId()));		
+		SoftwareFeature sf = jdbcTemplate.queryForObject("SELECT [ID],[DESCRIPTION] FROM [SSKMS].[dbo].[SOFTWARE_FEATURE] WHERE ID = ?", (rs, rowNum) -> new SoftwareFeature(rs.getInt("ID"), rs.getString("DESCRIPTION")), softwareFeature.getId());
+		
+		mnv.addObject("softwareParadigm", sp);
+		mnv.addObject("subjectArea", sa);
+		mnv.addObject("softwareFeature", sf);
+		
+		List<Map<String, Object>> list = jdbcTemplate.queryForList("SELECT SR.ID AS 'SECURITY REQUIREMENT ID', SR.DESCRIPTION AS 'SECURITY REQUIREMENT DESCRIPTION' "
+		+ "FROM [SSKMS].[dbo].[SOFTWARE_FEATURE_HAS_SECURITY_REQUIREMENT] AS SFHSR "
+		+ "INNER JOIN SOFTWARE_FEATURE SF ON SF.ID = SFHSR.SOFTWARE_FEATURE_ID "
+		+ "INNER JOIN SECURITY_REQUIREMENT SR ON SR.ID = SFHSR.SECURITY_REQUIREMENT_ID "
+		+ "WHERE SFHSR.SOFTWARE_FEATURE_ID = ?", softwareFeature.getId());
+		
+		List<SecurityRequirement> srList = new ArrayList<>();
+		
+		list.forEach(m -> {
+			SecurityRequirement sr = new SecurityRequirement("" + (int) m.get("SECURITY REQUIREMENT ID"), (String) m.get("SECURITY REQUIREMENT DESCRIPTION")); 
+			srList.add(sr);
+		});
+		
+		mnv.addObject("result", srList);
+		
+		mnv.addObject("securityRequirement", new SecurityRequirement());
+		
+		return mnv;
+	}
+	
+	@RequestMapping(path = "/security-acquisition/mse/manage", method = {RequestMethod.POST})
+	public ModelAndView manageSecurityRequirementSecurityErrorView(@ModelAttribute("securityRequirement") SecurityRequirement securityRequirement) {
+		ModelAndView mnv = new ModelAndView("mse-manage");
+		
+		
+		
+		SecurityRequirement sr = jdbcTemplate.queryForObject("SELECT [ID],[DESCRIPTION] FROM [SSKMS].[dbo].[SECURITY_REQUIREMENT] WHERE ID = ?", (rs, rowNum) -> new SecurityRequirement("" + rs.getInt("ID"), rs.getString("DESCRIPTION")), securityRequirement.getId());
+		mnv.addObject("securityRequirement", sr);
+		
+//		List<Map<String, Object>> list = jdbcTemplate.queryForList("SELECT SR.ID AS 'SECURITY REQUIREMENT ID', SR.DESCRIPTION AS 'SECURITY REQUIREMENT DESCRIPTION' "
+//		+ "FROM [SSKMS].[dbo].[SOFTWARE_FEATURE_HAS_SECURITY_REQUIREMENT] AS SFHSR "
+//		+ "INNER JOIN SOFTWARE_FEATURE SF ON SF.ID = SFHSR.SOFTWARE_FEATURE_ID "
+//		+ "INNER JOIN SECURITY_REQUIREMENT SR ON SR.ID = SFHSR.SECURITY_REQUIREMENT_ID "
+//		+ "WHERE SFHSR.SOFTWARE_FEATURE_ID = ?", softwareFeature.getId());
+//		
+//		List<SecurityRequirement> srList = new ArrayList<>();
+//		
+//		list.forEach(m -> {
+//			SecurityRequirement sr = new SecurityRequirement((int) m.get("SECURITY REQUIREMENT ID"), (String) m.get("SECURITY REQUIREMENT DESCRIPTION")); 
+//			srList.add(sr);
+//		});
+//		
+//		mnv.addObject("result", srList);
+		
 		return mnv;
 	}
 
