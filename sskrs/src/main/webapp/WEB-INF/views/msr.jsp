@@ -4,7 +4,7 @@
 	pageEncoding="UTF-8"%>
 <%@ page isELIgnored="false"%>
 <%@ taglib prefix="form" uri="http://www.springframework.org/tags/form"%>
-<%@ page import="org.uowd.sskrs.models.SoftwareFeature"%>
+<%@ page import="org.uowd.sskrs.models.SecurityRequirementManager"%>
 <%@ page import="java.util.List"%>
 
 <html>
@@ -19,7 +19,7 @@
 	<a href="/sskrs/security-acquisition"><img align="middle" src="/sskrs/resources/images/uowd-logo.png" /></a> 
 	<h1>Manage Security Requirements</h1>
 	
-	<form:form action="/sskrs/security-acquisition/msr" method="POST" modelAttribute="softwareFeature">
+	<form:form action="/sskrs/security-acquisition/msr" method="POST" modelAttribute="securityRequirementManager">
 		<table>
 			<thead>
 				<tr>
@@ -68,17 +68,17 @@
 			</thead>
 			<tbody id="myTable">
 				<%
-					List<SoftwareFeature> sfList = (ArrayList<SoftwareFeature>) request.getAttribute("result");
+					List<SecurityRequirementManager> srList = (ArrayList<SecurityRequirementManager>) request.getAttribute("result");
 					
-					for(SoftwareFeature sf : sfList)
+					for(SecurityRequirementManager sr : srList)
 					{
 						out.print("<tr>");
-						out.print("<td>" + sf.getDescription() + "</td>");
+						out.print("<td>" + sr.getSoftwareFeatureDescription() + "</td>");
 						out.print("<td>");						
-						out.print("<form method=\"POST\" action=\"/sskrs/security-acquisition/msr/manage\" modelAttribute=\"softwareFeature\" target=\"_blank\">");						
-						out.print("<input type=\"hidden\" id=\"id\" name=\"id\" value=\"" + sf.getId() + "\" />");						
-						out.print("<input type=\"hidden\" id=\"softwareParadigmId\" name=\"softwareParadigmId\" value=\"" + sf.getSoftwareParadigmId() + "\" />");						
-						out.print("<input type=\"hidden\" id=\"subjectAreaId\" name=\"subjectAreaId\" value=\"" + sf.getSubjectAreaId() + "\" />");						
+						out.print("<form method=\"POST\" action=\"/sskrs/security-acquisition/msr/manage\" modelAttribute=\"securityRequirementManager\" target=\"_blank\">");						
+						out.print("<input type=\"hidden\" id=\"softwareFeatureId\" name=\"softwareFeatureId\" value=\"" + sr.getSoftwareFeatureId() + "\" />");						
+						out.print("<input type=\"hidden\" id=\"softwareParadigmId\" name=\"softwareParadigmId\" value=\"" + sr.getSoftwareParadigmId() + "\" />");						
+						out.print("<input type=\"hidden\" id=\"subjectAreaId\" name=\"subjectAreaId\" value=\"" + sr.getSubjectAreaId() + "\" />");						
 						out.print("<input type=\"submit\" value=\"Manage Security Requirements\" />");						
 						out.print("</form>");
 						out.print("</td>");

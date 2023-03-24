@@ -8,6 +8,7 @@
 <%@ page import="org.uowd.sskrs.models.SubjectArea"%>
 <%@ page import="org.uowd.sskrs.models.SoftwareFeature"%>
 <%@ page import="org.uowd.sskrs.models.SecurityRequirement"%>
+<%@ page import="org.uowd.sskrs.models.SecurityRequirementManager" %>
 <%@ page import="java.util.List"%>
 
 <html>
@@ -34,21 +35,34 @@
 	
 	<hr />
 	
-	<form:form action="/sskrs/security-acquisition/msr/manage?action=add" method="POST" modelAttribute="securityRequirement">
-		
+	<div style="margin-bottom: 10px;">
+		<c:choose>
+			<c:when test="${status == '1'}">
+				<span style="color: green;">${message}</span>
+			</c:when>
+			<c:otherwise>
+				<span style="color: red;">${message}</span>
+			</c:otherwise>
+		</c:choose>
+	</div>
+	
+	<form:form action="/sskrs/security-acquisition/msr/manage?action=add" method="POST" modelAttribute="securityRequirementManager">
+		<form:hidden path="softwareFeatureId" />
+		<form:hidden path="softwareParadigmId" />
+		<form:hidden path="subjectAreaId" />
 		<table>
 			<tbody>
 				<tr>
-					<td><form:radiobutton path="newSecurityRequirment" value="N" label="Add New Security Requirement" /></td>
+					<td><form:radiobutton path="securityRequirementNewSecurityRequirment" value="N" label="Add New Security Requirement" /></td>
 					<td>
-						<form:label path="description">Name</form:label>
-						<form:input path="description" />
+						<form:label path="securityRequirementDescription">Name</form:label>
+						<form:input path="securityRequirementDescription" />
 					</td>
 				</tr>
 				<tr>
-					<td><form:radiobutton path="newSecurityRequirment" value="E" label="Select Existing Security Requirement" /></td>
+					<td><form:radiobutton path="securityRequirementNewSecurityRequirment" value="E" label="Select Existing Security Requirement" /></td>
 					<td>
-						<form:select path="id" style="width: 200px;">
+						<form:select path="securityRequirementId" style="width: 200px;">
 							<form:option value="" selected="true">Please Select..</form:option>
 							<form:options items="${securityRequirmentList}" itemValue="id" itemLabel="description" />
 						</form:select>

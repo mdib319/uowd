@@ -33,6 +33,7 @@ import org.springframework.web.servlet.ModelAndView;
 import org.uowd.sskrs.models.IdentificationRequest;
 import org.uowd.sskrs.models.ImplementationRequest;
 import org.uowd.sskrs.models.SecurityRequirement;
+import org.uowd.sskrs.models.SecurityRequirementManager;
 import org.uowd.sskrs.models.SoftwareFeature;
 import org.uowd.sskrs.models.SoftwareParadigm;
 import org.uowd.sskrs.models.SubjectArea;
@@ -1068,7 +1069,7 @@ public class MainController {
 	}
 	
 	@RequestMapping(path = "/security-acquisition/msr", method = {RequestMethod.GET, RequestMethod.POST})
-	public ModelAndView manageSecurityRequirementView(@ModelAttribute("softwareFeature") SoftwareFeature softwareFeature, HttpServletRequest request) {
+	public ModelAndView manageSecurityRequirementView(@ModelAttribute("securityRequirementManager") SecurityRequirementManager securityRequirementManager, HttpServletRequest request) {
 		ModelAndView mnv = new ModelAndView("msr");
 		
 		if (request.getMethod().equals(RequestMethod.POST.name())) {
@@ -1083,18 +1084,19 @@ public class MainController {
 	        		+ "INNER JOIN SUBJECT_AREA AS SA ON SA.ID = SAHSF.SUBJECT_AREA_ID "
 	        		+ "WHERE SP.ID = ? AND SA.ID = ? "
 	        		+ "ORDER BY CAST(SF.DESCRIPTION AS VARCHAR(MAX)), CAST(SP.DESCRIPTION AS VARCHAR(MAX)), CAST(SA.DESCRIPTION AS VARCHAR(MAX)) ASC"
-	        		, softwareFeature.getSoftwareParadigmId(), softwareFeature.getSubjectAreaId());
+	        		, securityRequirementManager.getSoftwareParadigmId(), securityRequirementManager.getSubjectAreaId());
 	        
-	        List<SoftwareFeature> sfList = new ArrayList<>();        
+	        List<SecurityRequirementManager> srList = new ArrayList<>();        
 	        list.forEach(m -> {               
-	        	SoftwareFeature sf = new SoftwareFeature((int) m.get("SOFTWARE FEATURE ID"), (String) m.get("SOFTWARE FEATURE DESCRIPTION"),
+	        	SecurityRequirementManager sr = new SecurityRequirementManager("" + (int) m.get("SOFTWARE FEATURE ID"), (String) m.get("SOFTWARE FEATURE DESCRIPTION"),
 	        			"" + (int) m.get("SOFTWARE PARADIGM ID"), (String) m.get("SOFTWARE PARADIGM DESCRIPTION"),
-	        			"" + (int) m.get("SUBJECT AREA ID"), (String) m.get("SUBJECT AREA DESCRIPTION"));
+	        			"" + (int) m.get("SUBJECT AREA ID"), (String) m.get("SUBJECT AREA DESCRIPTION"),
+	        			"-1", "", "");
 	        	
-	        	sfList.add(sf);
+	        	srList.add(sr);
 	        });
 			
-			mnv.addObject("result", sfList);
+			mnv.addObject("result", srList);
 		}
 		
 		List<Map<String, Object>> list = jdbcTemplate.queryForList("SELECT * FROM SOFTWARE_PARADIGM");
@@ -1123,14 +1125,94 @@ public class MainController {
 	}
 	
 	@RequestMapping(path = "/security-acquisition/msr/manage", method = {RequestMethod.POST})
-	public ModelAndView manageSoftwareFeatureSecurityRequirementView(@ModelAttribute("softwareFeature") SoftwareFeature softwareFeature) {
+	public ModelAndView manageSoftwareFeatureSecurityRequirementView(@ModelAttribute("securityRequirementManager") SecurityRequirementManager securityRequirementManager, 
+			@RequestParam(name = "action", defaultValue = "init", required = false) String action) {
 		ModelAndView mnv = new ModelAndView("msr-manage");
 		
+		if(action.contentEquals("add"))
+		{
+			if(securityRequirementManager.getSecurityRequirementNewSecurityRequirment().contentEquals("N"))
+			{
+				if(securityRequirementManager.getSecurityRequirementDescription().trim().isEmpty())
+				{
+					mnv.addObject(STATUS, "0");
+	    			mnv.addObject(MESSAGE, "Security Requirement Name may not be empty.");
+				}
+				else
+				{
+					int numOfRecords = jdbcTemplate.queryForObject(
+	    					"SELECT COUNT(*) AS NUMOFRECORDS FROM [SSKMS].[dbo].[SECURITY_REQUIREMENT] WHERE CAST(DESCRIPTION AS varchar(MAX)) = ?",
+	    					(rs, rowNum) -> rs.getInt("NUMOFRECORDS"), securityRequirementManager.getSecurityRequirementDescription());
+
+	    			if (numOfRecords > 0) 
+	    			{
+	    				mnv.addObject(STATUS, "0");
+	    				mnv.addObject(MESSAGE, "Security Requirement '" + securityRequirementManager.getSecurityRequirementDescription() + "' already exists.");
+	    			}
+	    			else
+	    			{
+	    				int rows = jdbcTemplate.update("INSERT INTO [dbo].[SECURITY_REQUIREMENT] ([DESCRIPTION]) VALUES (?)", securityRequirementManager.getSecurityRequirementDescription());
+
+	    				if (rows == 1)
+	    				{
+	    					int securityRequirementId = jdbcTemplate.queryForObject(
+	    	    					"SELECT ID FROM [SSKMS].[dbo].[SECURITY_REQUIREMENT] WHERE CAST(DESCRIPTION AS varchar(MAX)) = ?",
+	    	    					(rs, rowNum) -> rs.getInt("ID"), securityRequirementManager.getSecurityRequirementDescription());
+	    					
+	    					rows = jdbcTemplate.update("INSERT INTO [dbo].[SOFTWARE_FEATURE_HAS_SECURITY_REQUIREMENT] ([SOFTWARE_FEATURE_ID], [SECURITY_REQUIREMENT_ID]) VALUES (?, ?)", securityRequirementManager.getSoftwareFeatureId(), securityRequirementId);
+	    					
+	    					if (rows == 1)
+		    				{
+		    					mnv.addObject(STATUS, "1");
+		    					mnv.addObject(MESSAGE,
+		    							"Security Requirement '" + securityRequirementManager.getSecurityRequirementDescription() + "' added successfully.");
+		    				}
+	    					else
+	    					{
+	    						mnv.addObject(STATUS, "0");
+		    					mnv.addObject(MESSAGE,
+		    							"Error occurred while associating Security Requirement '" + securityRequirementManager.getSecurityRequirementDescription() + "' to the selected Software Feature.");
+	    					}
+	    				}
+	    				else
+	    				{
+	    					mnv.addObject(STATUS, "0");
+	    					mnv.addObject(MESSAGE,
+	    							"Error occurred while adding Software Paradigm '" + securityRequirementManager.getSecurityRequirementDescription() + "'.");
+	    				}
+	    			}
+				}
+			}
+			else if(securityRequirementManager.getSecurityRequirementNewSecurityRequirment().contentEquals("E"))
+			{
+				if(securityRequirementManager.getSecurityRequirementId().trim().isEmpty() || securityRequirementManager.getSecurityRequirementId().contentEquals("-1"))
+				{
+					mnv.addObject(STATUS, "0");
+    				mnv.addObject(MESSAGE, "Security Requirement should be selected.");
+				}
+				else
+				{
+					int rows = jdbcTemplate.update("INSERT INTO [dbo].[SOFTWARE_FEATURE_HAS_SECURITY_REQUIREMENT] ([SOFTWARE_FEATURE_ID], [SECURITY_REQUIREMENT_ID]) VALUES (?, ?)", securityRequirementManager.getSoftwareFeatureId(), securityRequirementManager.getSecurityRequirementId());
+					
+					if (rows == 1)
+    				{
+    					mnv.addObject(STATUS, "1");
+    					mnv.addObject(MESSAGE,
+    							"Security Requirement '" + securityRequirementManager.getSecurityRequirementDescription() + "' added successfully.");
+    				}
+					else
+					{
+						mnv.addObject(STATUS, "0");
+    					mnv.addObject(MESSAGE,
+    							"Error occurred while associating Security Requirement '" + securityRequirementManager.getSecurityRequirementDescription() + "' to the selected Software Feature.");
+					}
+				}
+			}
+		}
 		
-		
-		SoftwareParadigm sp = jdbcTemplate.queryForObject("SELECT [ID],[DESCRIPTION] FROM [SSKMS].[dbo].[SOFTWARE_PARADIGM] WHERE ID = ?", (rs, rowNum) -> new SoftwareParadigm(rs.getInt("ID"), rs.getString("DESCRIPTION")), Integer.parseInt(softwareFeature.getSoftwareParadigmId()));
-		SubjectArea sa = jdbcTemplate.queryForObject("SELECT [ID],[DESCRIPTION] FROM [SSKMS].[dbo].[SUBJECT_AREA] WHERE ID = ?", (rs, rowNum) -> new SubjectArea(rs.getInt("ID"), rs.getString("DESCRIPTION")), Integer.parseInt(softwareFeature.getSubjectAreaId()));		
-		SoftwareFeature sf = jdbcTemplate.queryForObject("SELECT [ID],[DESCRIPTION] FROM [SSKMS].[dbo].[SOFTWARE_FEATURE] WHERE ID = ?", (rs, rowNum) -> new SoftwareFeature(rs.getInt("ID"), rs.getString("DESCRIPTION")), softwareFeature.getId());
+		SoftwareParadigm sp = jdbcTemplate.queryForObject("SELECT [ID],[DESCRIPTION] FROM [SSKMS].[dbo].[SOFTWARE_PARADIGM] WHERE ID = ?", (rs, rowNum) -> new SoftwareParadigm(rs.getInt("ID"), rs.getString("DESCRIPTION")), Integer.parseInt(securityRequirementManager.getSoftwareParadigmId()));
+		SubjectArea sa = jdbcTemplate.queryForObject("SELECT [ID],[DESCRIPTION] FROM [SSKMS].[dbo].[SUBJECT_AREA] WHERE ID = ?", (rs, rowNum) -> new SubjectArea(rs.getInt("ID"), rs.getString("DESCRIPTION")), Integer.parseInt(securityRequirementManager.getSubjectAreaId()));		
+		SoftwareFeature sf = jdbcTemplate.queryForObject("SELECT [ID],[DESCRIPTION] FROM [SSKMS].[dbo].[SOFTWARE_FEATURE] WHERE ID = ?", (rs, rowNum) -> new SoftwareFeature(rs.getInt("ID"), rs.getString("DESCRIPTION")), securityRequirementManager.getSoftwareFeatureId());
 		
 		mnv.addObject("softwareParadigm", sp);
 		mnv.addObject("subjectArea", sa);
@@ -1140,7 +1222,7 @@ public class MainController {
 		+ "FROM [SSKMS].[dbo].[SOFTWARE_FEATURE_HAS_SECURITY_REQUIREMENT] AS SFHSR "
 		+ "INNER JOIN SOFTWARE_FEATURE SF ON SF.ID = SFHSR.SOFTWARE_FEATURE_ID "
 		+ "INNER JOIN SECURITY_REQUIREMENT SR ON SR.ID = SFHSR.SECURITY_REQUIREMENT_ID "
-		+ "WHERE SFHSR.SOFTWARE_FEATURE_ID = ?", softwareFeature.getId());
+		+ "WHERE SFHSR.SOFTWARE_FEATURE_ID = ?", securityRequirementManager.getSoftwareFeatureId());
 		
 		List<SecurityRequirement> srList = new ArrayList<>();
 		
@@ -1151,7 +1233,20 @@ public class MainController {
 		
 		mnv.addObject("result", srList);
 		
-		mnv.addObject("securityRequirement", new SecurityRequirement());
+		mnv.addObject("securityRequirementManager", new SecurityRequirementManager("" + sf.getId(), sf.getDescription(), "" + sp.getId(), sp.getDescription(), "" + sa.getId(), sa.getDescription(), "-1", "", "N"));
+		
+		list = jdbcTemplate.queryForList("SELECT SR.ID, SR.DESCRIPTION "
+		+ "FROM SECURITY_REQUIREMENT AS SR "
+		+ "WHERE SR.ID NOT IN (SELECT SFHSR.SECURITY_REQUIREMENT_ID FROM SOFTWARE_FEATURE_HAS_SECURITY_REQUIREMENT AS SFHSR WHERE SFHSR.SOFTWARE_FEATURE_ID = ?)", securityRequirementManager.getSoftwareFeatureId());
+		
+		List<SecurityRequirement> srList2 = new ArrayList<>();
+		
+		list.forEach(m -> {
+			SecurityRequirement sr = new SecurityRequirement("" + (int) m.get("ID"), (String) m.get("DESCRIPTION")); 
+			srList2.add(sr);
+		});
+		
+		mnv.addObject("securityRequirmentList", srList2);
 		
 		return mnv;
 	}
