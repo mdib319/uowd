@@ -1,3 +1,5 @@
+<!DOCTYPE html>
+
 <%@page import="java.util.ArrayList"%>
 <%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core"%>
 <%@ page language="java" contentType="text/html; charset=UTF-8"
@@ -9,7 +11,9 @@
 <%@ page import="org.uowd.sskrs.models.SoftwareFeature"%>
 <%@ page import="org.uowd.sskrs.models.SecurityRequirement"%>
 <%@ page import="org.uowd.sskrs.models.SecurityRequirementManager" %>
+<%@ page import="org.uowd.sskrs.models.SecurityErrorManager" %>
 <%@ page import="java.util.List"%>
+
 
 <html>
 <head>
@@ -53,23 +57,28 @@
 		<table>
 			<tbody>
 				<tr>
-					<td><form:radiobutton path="securityRequirementNewSecurityRequirment" value="N" label="Add New Security Requirement" /></td>
-					<td>
-						<form:label path="securityRequirementDescription">Name</form:label>
-						<form:input path="securityRequirementDescription" />
-					</td>
+					<td><form:radiobutton path="securityRequirementNewSecurityRequirment" value="E" label="Select Existing Security Requirement" /></td>
 				</tr>
 				<tr>
-					<td><form:radiobutton path="securityRequirementNewSecurityRequirment" value="E" label="Select Existing Security Requirement" /></td>
 					<td>
-						<form:select path="securityRequirementId" style="width: 200px;">
-							<form:option value="" selected="true">Please Select..</form:option>
-							<form:options items="${securityRequirmentList}" itemValue="id" itemLabel="description" />
+						&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<form:select path="securityRequirementId" style="width: 300px;">
+							<form:option value="" selected="true">Please Select..</form:option>							
+							<c:forEach var="sr" items="${securityRequirmentList}">  
+								<form:option value="${sr.id}" label="${sr.description}" title="${sr.description}" />  
+							</c:forEach>
 						</form:select>
 					</td>
 				</tr>
 				<tr>
-					<td colspan="2" align="right"><input type="submit" value="Add" /></td>
+					<td><form:radiobutton path="securityRequirementNewSecurityRequirment" value="N" label="Add New Security Requirement" /></td>
+				</tr>
+				<tr>
+					<td>
+						&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<form:input path="securityRequirementDescription" size="38" />
+					</td>
+				</tr>
+				<tr>
+					<td align="right"><input type="submit" value="Add" /></td>
 				</tr>
 			</tbody>
 		</table>		
@@ -93,6 +102,10 @@
 			</thead>
 			<tbody id="myTable">
 				<%
+					SoftwareParadigm sp = (SoftwareParadigm) request.getAttribute("softwareParadigm");
+					SubjectArea sa = (SubjectArea) request.getAttribute("subjectArea");
+					SoftwareFeature sf = (SoftwareFeature) request.getAttribute("softwareFeature");
+				
 					List<SecurityRequirement> srList = (ArrayList<SecurityRequirement>) request.getAttribute("result");
 					
 					for(SecurityRequirement sr : srList)
@@ -100,10 +113,20 @@
 						out.print("<tr>");
 						out.print("<td>" + sr.getDescription() + "</td>");
 						out.print("<td>");						
-						out.print("<form method=\"POST\" action=\"/sskrs/security-acquisition/mse/manage\" modelAttribute=\"softwareFeature\" target=\"_blank\">");						
-						out.print("<input type=\"hidden\" id=\"id\" name=\"id\" value=\"" + sr.getId() + "\" />");						
+						
+						out.print("<form method=\"POST\" action=\"/sskrs/security-acquisition/mse/manage\" modelAttribute=\"securityErrorManager\" target=\"_blank\">");						
+						out.print("<input type=\"hidden\" id=\"securityRequirementId\" name=\"securityRequirementId\" value=\"" + sr.getId() + "\" />");						
 						out.print("<input type=\"submit\" value=\"Manage Security Errors\" />");						
 						out.print("</form>");
+						
+						out.print("<form method=\"POST\" action=\"/sskrs/security-acquisition/msr/manage?action=delete\" modelAttribute=\"securityRequirementManager\">");
+						out.print("<input type=\"hidden\" id=\"SoftwareParadigmId\" name=\"SoftwareParadigmId\" value=\"" + sp.getId() + "\" />");
+						out.print("<input type=\"hidden\" id=\"subjectAreaId\" name=\"subjectAreaId\" value=\"" + sa.getId() + "\" />");
+						out.print("<input type=\"hidden\" id=\"softwareFeatureId\" name=\"softwareFeatureId\" value=\"" + sf.getId() + "\" />");
+						out.print("<input type=\"hidden\" id=\"securityRequirementId\" name=\"securityRequirementId\" value=\"" + sr.getId() + "\" />");						
+						out.print("<input type=\"submit\" value=\"Remove\" />");
+						out.print("</form>");
+						
 						out.print("</td>");
 						out.print("</tr>");
 					}

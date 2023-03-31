@@ -32,10 +32,14 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.ModelAndView;
 import org.uowd.sskrs.models.IdentificationRequest;
 import org.uowd.sskrs.models.ImplementationRequest;
+import org.uowd.sskrs.models.SecurityError;
+import org.uowd.sskrs.models.SecurityErrorManager;
 import org.uowd.sskrs.models.SecurityRequirement;
 import org.uowd.sskrs.models.SecurityRequirementManager;
 import org.uowd.sskrs.models.SoftwareFeature;
 import org.uowd.sskrs.models.SoftwareParadigm;
+import org.uowd.sskrs.models.SoftwareWeakness;
+import org.uowd.sskrs.models.SoftwareWeaknessManager;
 import org.uowd.sskrs.models.SubjectArea;
 import org.uowd.sskrs.models.VerificationRequest;
 
@@ -1178,7 +1182,7 @@ public class MainController {
 	    				{
 	    					mnv.addObject(STATUS, "0");
 	    					mnv.addObject(MESSAGE,
-	    							"Error occurred while adding Software Paradigm '" + securityRequirementManager.getSecurityRequirementDescription() + "'.");
+	    							"Error occurred while adding Security Requirement '" + securityRequirementManager.getSecurityRequirementDescription() + "'.");
 	    				}
 	    			}
 				}
@@ -1209,6 +1213,24 @@ public class MainController {
 				}
 			}
 		}
+		else if(action.contentEquals("delete"))
+		{
+			int rows = jdbcTemplate.update("DELETE FROM [dbo].[SOFTWARE_FEATURE_HAS_SECURITY_REQUIREMENT] WHERE SOFTWARE_FEATURE_ID = ? AND SECURITY_REQUIREMENT_ID = ?", 
+					securityRequirementManager.getSoftwareFeatureId(), securityRequirementManager.getSecurityRequirementId());
+			
+			if (rows == 1)
+			{
+				mnv.addObject(STATUS, "1");
+				mnv.addObject(MESSAGE,
+						"Security Requirement removed successfully.");
+			}
+			else
+			{
+				mnv.addObject(STATUS, "0");
+				mnv.addObject(MESSAGE,
+						"Error occurred while removing Security Requirement.");
+			}
+		}
 		
 		SoftwareParadigm sp = jdbcTemplate.queryForObject("SELECT [ID],[DESCRIPTION] FROM [SSKMS].[dbo].[SOFTWARE_PARADIGM] WHERE ID = ?", (rs, rowNum) -> new SoftwareParadigm(rs.getInt("ID"), rs.getString("DESCRIPTION")), Integer.parseInt(securityRequirementManager.getSoftwareParadigmId()));
 		SubjectArea sa = jdbcTemplate.queryForObject("SELECT [ID],[DESCRIPTION] FROM [SSKMS].[dbo].[SUBJECT_AREA] WHERE ID = ?", (rs, rowNum) -> new SubjectArea(rs.getInt("ID"), rs.getString("DESCRIPTION")), Integer.parseInt(securityRequirementManager.getSubjectAreaId()));		
@@ -1233,7 +1255,7 @@ public class MainController {
 		
 		mnv.addObject("result", srList);
 		
-		mnv.addObject("securityRequirementManager", new SecurityRequirementManager("" + sf.getId(), sf.getDescription(), "" + sp.getId(), sp.getDescription(), "" + sa.getId(), sa.getDescription(), "-1", "", "N"));
+		mnv.addObject("securityRequirementManager", new SecurityRequirementManager("" + sf.getId(), sf.getDescription(), "" + sp.getId(), sp.getDescription(), "" + sa.getId(), sa.getDescription(), "-1", "", "E"));
 		
 		list = jdbcTemplate.queryForList("SELECT SR.ID, SR.DESCRIPTION "
 		+ "FROM SECURITY_REQUIREMENT AS SR "
@@ -1252,28 +1274,283 @@ public class MainController {
 	}
 	
 	@RequestMapping(path = "/security-acquisition/mse/manage", method = {RequestMethod.POST})
-	public ModelAndView manageSecurityRequirementSecurityErrorView(@ModelAttribute("securityRequirement") SecurityRequirement securityRequirement) {
+	public ModelAndView manageSecurityRequirementSecurityErrorView(@ModelAttribute("securityErrorManager") SecurityErrorManager securityErrorManager, 
+			@RequestParam(name = "action", defaultValue = "init", required = false) String action) {
 		ModelAndView mnv = new ModelAndView("mse-manage");
 		
+		if(action.contentEquals("add"))
+		{
+			if(securityErrorManager.getSecurityErrorNewSecurityRequirment().contentEquals("N"))
+			{
+				if(securityErrorManager.getSecurityErrorDescription().trim().isEmpty())
+				{
+					mnv.addObject(STATUS, "0");
+	    			mnv.addObject(MESSAGE, "Security Error Name may not be empty.");
+				}
+				else
+				{
+					int numOfRecords = jdbcTemplate.queryForObject(
+	    					"SELECT COUNT(*) AS NUMOFRECORDS FROM [SSKMS].[dbo].[SECURITY_ERROR] WHERE CAST(DESCRIPTION AS varchar(MAX)) = ?",
+	    					(rs, rowNum) -> rs.getInt("NUMOFRECORDS"), securityErrorManager.getSecurityErrorDescription());
+
+	    			if (numOfRecords > 0) 
+	    			{
+	    				mnv.addObject(STATUS, "0");
+	    				mnv.addObject(MESSAGE, "Security Error '" + securityErrorManager.getSecurityErrorDescription() + "' already exists.");
+	    			}
+	    			else
+	    			{
+	    				int rows = jdbcTemplate.update("INSERT INTO [dbo].[SECURITY_ERROR] ([DESCRIPTION]) VALUES (?)", securityErrorManager.getSecurityErrorDescription());
+
+	    				if (rows == 1)
+	    				{
+	    					int securityErrorId = jdbcTemplate.queryForObject(
+	    	    					"SELECT ID FROM [SSKMS].[dbo].[SECURITY_ERROR] WHERE CAST(DESCRIPTION AS varchar(MAX)) = ?",
+	    	    					(rs, rowNum) -> rs.getInt("ID"), securityErrorManager.getSecurityErrorDescription());
+	    					
+	    					rows = jdbcTemplate.update("INSERT INTO [dbo].[SECURITY_REQUIREMENT_ASSOCIATED_SECURITY_ERROR] ([SECURITY_REQUIREMENT_ID], [SECURITY_ERROR_ID]) VALUES (?, ?)", securityErrorManager.getSecurityRequirementId(), securityErrorId);
+	    					
+	    					if (rows == 1)
+		    				{
+		    					mnv.addObject(STATUS, "1");
+		    					mnv.addObject(MESSAGE,
+		    							"Security Error '" + securityErrorManager.getSecurityErrorDescription() + "' added successfully.");
+		    				}
+	    					else
+	    					{
+	    						mnv.addObject(STATUS, "0");
+		    					mnv.addObject(MESSAGE,
+		    							"Error occurred while associating Security Error '" + securityErrorManager.getSecurityErrorDescription() + "' to the selected Security Requirement.");
+	    					}
+	    				}
+	    				else
+	    				{
+	    					mnv.addObject(STATUS, "0");
+	    					mnv.addObject(MESSAGE,
+	    							"Error occurred while adding Security Error '" + securityErrorManager.getSecurityErrorDescription() + "'.");
+	    				}
+	    			}
+				}
+			}
+			else if(securityErrorManager.getSecurityErrorNewSecurityRequirment().contentEquals("E"))
+			{
+				if(securityErrorManager.getSecurityErrorId().trim().isEmpty() || securityErrorManager.getSecurityErrorId().contentEquals("-1"))
+				{
+					mnv.addObject(STATUS, "0");
+    				mnv.addObject(MESSAGE, "Security Error should be selected.");
+				}
+				else
+				{
+					int rows = jdbcTemplate.update("INSERT INTO [dbo].[SECURITY_REQUIREMENT_ASSOCIATED_SECURITY_ERROR] ([SECURITY_REQUIREMENT_ID], [SECURITY_ERROR_ID]) VALUES (?, ?)", securityErrorManager.getSecurityRequirementId(), securityErrorManager.getSecurityErrorId());
+					
+					if (rows == 1)
+    				{
+    					mnv.addObject(STATUS, "1");
+    					mnv.addObject(MESSAGE,
+    							"Security Error '" + securityErrorManager.getSecurityErrorDescription() + "' added successfully.");
+    				}
+					else
+					{
+						mnv.addObject(STATUS, "0");
+    					mnv.addObject(MESSAGE,
+    							"Error occurred while associating Security Error '" + securityErrorManager.getSecurityErrorDescription() + "' to the selected Security Requirement.");
+					}
+				}
+			}
+		}
+		else if(action.contentEquals("delete"))
+		{
+			int rows = jdbcTemplate.update("DELETE FROM [dbo].[SECURITY_REQUIREMENT_ASSOCIATED_SECURITY_ERROR] WHERE SECURITY_REQUIREMENT_ID = ? AND SECURITY_ERROR_ID = ?", 
+					securityErrorManager.getSecurityRequirementId(), securityErrorManager.getSecurityErrorId());
+			
+			if (rows == 1)
+			{
+				mnv.addObject(STATUS, "1");
+				mnv.addObject(MESSAGE,
+						"Security Error removed successfully.");
+			}
+			else
+			{
+				mnv.addObject(STATUS, "0");
+				mnv.addObject(MESSAGE,
+						"Error occurred while removing Security Error.");
+			}
+		}
 		
+		SecurityRequirement sr = jdbcTemplate.queryForObject("SELECT [ID],[DESCRIPTION] FROM [SSKMS].[dbo].[SECURITY_REQUIREMENT] WHERE ID = ?", (rs, rowNum) -> new SecurityRequirement("" + rs.getInt("ID"), rs.getString("DESCRIPTION")), Integer.parseInt(securityErrorManager.getSecurityRequirementId()));
 		
-		SecurityRequirement sr = jdbcTemplate.queryForObject("SELECT [ID],[DESCRIPTION] FROM [SSKMS].[dbo].[SECURITY_REQUIREMENT] WHERE ID = ?", (rs, rowNum) -> new SecurityRequirement("" + rs.getInt("ID"), rs.getString("DESCRIPTION")), securityRequirement.getId());
 		mnv.addObject("securityRequirement", sr);
 		
-//		List<Map<String, Object>> list = jdbcTemplate.queryForList("SELECT SR.ID AS 'SECURITY REQUIREMENT ID', SR.DESCRIPTION AS 'SECURITY REQUIREMENT DESCRIPTION' "
-//		+ "FROM [SSKMS].[dbo].[SOFTWARE_FEATURE_HAS_SECURITY_REQUIREMENT] AS SFHSR "
-//		+ "INNER JOIN SOFTWARE_FEATURE SF ON SF.ID = SFHSR.SOFTWARE_FEATURE_ID "
-//		+ "INNER JOIN SECURITY_REQUIREMENT SR ON SR.ID = SFHSR.SECURITY_REQUIREMENT_ID "
-//		+ "WHERE SFHSR.SOFTWARE_FEATURE_ID = ?", softwareFeature.getId());
-//		
-//		List<SecurityRequirement> srList = new ArrayList<>();
-//		
-//		list.forEach(m -> {
-//			SecurityRequirement sr = new SecurityRequirement((int) m.get("SECURITY REQUIREMENT ID"), (String) m.get("SECURITY REQUIREMENT DESCRIPTION")); 
-//			srList.add(sr);
-//		});
-//		
-//		mnv.addObject("result", srList);
+		List<Map<String, Object>> list = jdbcTemplate.queryForList("SELECT SE.ID AS 'SECURITY ERROR ID', SE.DESCRIPTION AS 'SECURITY ERROR DESCRIPTION' "
+		+ "FROM [SSKMS].[dbo].[SECURITY_REQUIREMENT_ASSOCIATED_SECURITY_ERROR] AS SRASE "
+		+ "INNER JOIN SECURITY_REQUIREMENT SR ON SR.ID = SRASE.SECURITY_REQUIREMENT_ID "
+		+ "INNER JOIN SECURITY_ERROR SE ON SE.ID = SRASE.SECURITY_ERROR_ID "
+		+ "WHERE SRASE.SECURITY_REQUIREMENT_ID = ?", securityErrorManager.getSecurityRequirementId());
+		
+		List<SecurityError> seList = new ArrayList<>();
+		
+		list.forEach(m -> {
+			SecurityError se = new SecurityError("" + (int) m.get("SECURITY ERROR ID"), (String) m.get("SECURITY ERROR DESCRIPTION")); 
+			seList.add(se);
+		});
+		
+		mnv.addObject("result", seList);
+		
+		mnv.addObject("securityErrorManager", new SecurityErrorManager("" + sr.getId(), sr.getDescription(), "-1", "", "E"));
+		
+		list = jdbcTemplate.queryForList("SELECT SE.ID, SE.DESCRIPTION "
+		+ "FROM SECURITY_ERROR AS SE "
+		+ "WHERE SE.ID NOT IN (SELECT SRASE.SECURITY_ERROR_ID FROM SECURITY_REQUIREMENT_ASSOCIATED_SECURITY_ERROR AS SRASE WHERE SRASE.SECURITY_REQUIREMENT_ID = ?)", securityErrorManager.getSecurityRequirementId());
+		
+		List<SecurityError> seList2 = new ArrayList<>();
+		
+		list.forEach(m -> {
+			SecurityError se = new SecurityError("" + (int) m.get("ID"), (String) m.get("DESCRIPTION")); 
+			seList2.add(se);
+		});
+		
+		mnv.addObject("securityErrorList", seList2);
+		
+		return mnv;
+	}
+	
+	@RequestMapping(path = "/security-acquisition/msw/manage", method = {RequestMethod.POST})
+	public ModelAndView manageSecurityErrorSoftwareWeaknessView(@ModelAttribute("softwareWeaknessManager") SoftwareWeaknessManager softwareWeaknessManager, 
+			@RequestParam(name = "action", defaultValue = "init", required = false) String action) {
+		ModelAndView mnv = new ModelAndView("msw-manage");
+		
+		if(action.contentEquals("add"))
+		{
+			if(softwareWeaknessManager.getSoftwareWeaknessNewSoftwareWeakness().contentEquals("N"))
+			{
+				if(softwareWeaknessManager.getSoftwareWeaknessDescription().trim().isEmpty())
+				{
+					mnv.addObject(STATUS, "0");
+	    			mnv.addObject(MESSAGE, "Software Weakness Name may not be empty.");
+				}
+				else
+				{
+					int numOfRecords = jdbcTemplate.queryForObject(
+	    					"SELECT COUNT(*) AS NUMOFRECORDS FROM [SSKMS].[dbo].[SOFTWARE_WEAKNESS] WHERE CAST(DESCRIPTION AS varchar(MAX)) = ?",
+	    					(rs, rowNum) -> rs.getInt("NUMOFRECORDS"), softwareWeaknessManager.getSoftwareWeaknessDescription());
+
+	    			if (numOfRecords > 0) 
+	    			{
+	    				mnv.addObject(STATUS, "0");
+	    				mnv.addObject(MESSAGE, "Software Weakness '" + softwareWeaknessManager.getSoftwareWeaknessDescription() + "' already exists.");
+	    			}
+	    			else
+	    			{
+	    				int rows = jdbcTemplate.update("INSERT INTO [dbo].[SOFTWARE_WEAKNESS] ([DESCRIPTION]) VALUES (?)", softwareWeaknessManager.getSoftwareWeaknessDescription());
+
+	    				if (rows == 1)
+	    				{
+	    					int softwareWeaknessId = jdbcTemplate.queryForObject(
+	    	    					"SELECT ID FROM [SSKMS].[dbo].[SOFTWARE_WEAKNESS] WHERE CAST(DESCRIPTION AS varchar(MAX)) = ?",
+	    	    					(rs, rowNum) -> rs.getInt("ID"), softwareWeaknessManager.getSoftwareWeaknessDescription());
+	    					
+	    					rows = jdbcTemplate.update("INSERT INTO [dbo].[SECURITY_ERROR_CAUSES_SOFTWARE_WEAKNESS] ([SECURITY_ERROR_ID], [SOFTWARE_WEAKNESS_ID]) VALUES (?, ?)", softwareWeaknessManager.getSecurityErrorId(), softwareWeaknessId);
+	    					
+	    					if (rows == 1)
+		    				{
+		    					mnv.addObject(STATUS, "1");
+		    					mnv.addObject(MESSAGE,
+		    							"Software Weakness '" + softwareWeaknessManager.getSoftwareWeaknessDescription() + "' added successfully.");
+		    				}
+	    					else
+	    					{
+	    						mnv.addObject(STATUS, "0");
+		    					mnv.addObject(MESSAGE,
+		    							"Error occurred while associating Software Weakness '" + softwareWeaknessManager.getSoftwareWeaknessDescription() + "' to the selected Security Error.");
+	    					}
+	    				}
+	    				else
+	    				{
+	    					mnv.addObject(STATUS, "0");
+	    					mnv.addObject(MESSAGE,
+	    							"Error occurred while adding Software Weakness '" + softwareWeaknessManager.getSoftwareWeaknessDescription() + "'.");
+	    				}
+	    			}
+				}
+			}
+			else if(softwareWeaknessManager.getSoftwareWeaknessNewSoftwareWeakness().contentEquals("E"))
+			{
+				if(softwareWeaknessManager.getSoftwareWeaknessId().trim().isEmpty() || softwareWeaknessManager.getSoftwareWeaknessId().contentEquals("-1"))
+				{
+					mnv.addObject(STATUS, "0");
+    				mnv.addObject(MESSAGE, "Software Weakness should be selected.");
+				}
+				else
+				{
+					int rows = jdbcTemplate.update("INSERT INTO [dbo].[SECURITY_ERROR_CAUSES_SOFTWARE_WEAKNESS] ([SECURITY_ERROR_ID], [SOFTWARE_WEAKNESS_ID]) VALUES (?, ?)", softwareWeaknessManager.getSecurityErrorId(), softwareWeaknessManager.getSoftwareWeaknessId());
+					
+					if (rows == 1)
+    				{
+    					mnv.addObject(STATUS, "1");
+    					mnv.addObject(MESSAGE,
+    							"Software Weakness '" + softwareWeaknessManager.getSoftwareWeaknessDescription() + "' added successfully.");
+    				}
+					else
+					{
+						mnv.addObject(STATUS, "0");
+    					mnv.addObject(MESSAGE,
+    							"Error occurred while associating Software Weakness '" + softwareWeaknessManager.getSoftwareWeaknessDescription() + "' to the selected Security Error.");
+					}
+				}
+			}
+		}
+		else if(action.contentEquals("delete"))
+		{
+			int rows = jdbcTemplate.update("DELETE FROM [dbo].[SECURITY_ERROR_CAUSES_SOFTWARE_WEAKNESS] WHERE SECURITY_ERROR_ID = ? AND SOFTWARE_WEAKNESS_ID = ?", 
+					softwareWeaknessManager.getSecurityErrorId(), softwareWeaknessManager.getSoftwareWeaknessId());
+			
+			if (rows == 1)
+			{
+				mnv.addObject(STATUS, "1");
+				mnv.addObject(MESSAGE,
+						"Software Weakness removed successfully.");
+			}
+			else
+			{
+				mnv.addObject(STATUS, "0");
+				mnv.addObject(MESSAGE,
+						"Error occurred while removing Software Weakness.");
+			}
+		}
+		
+		SecurityError se = jdbcTemplate.queryForObject("SELECT [ID],[DESCRIPTION] FROM [SSKMS].[dbo].[SECURITY_ERROR] WHERE ID = ?", (rs, rowNum) -> new SecurityError("" + rs.getInt("ID"), rs.getString("DESCRIPTION")), Integer.parseInt(softwareWeaknessManager.getSecurityErrorId()));
+		
+		mnv.addObject("securityError", se);
+		
+		List<Map<String, Object>> list = jdbcTemplate.queryForList("SELECT SW.ID AS 'SOFTWARE WEAKNESS ID', SW.DESCRIPTION AS 'SOFTWARE WEAKNESS DESCRIPTION' "
+		+ "FROM [SSKMS].[dbo].[SECURITY_ERROR_CAUSES_SOFTWARE_WEAKNESS] AS SECSW "
+		+ "INNER JOIN SECURITY_ERROR SE ON SE.ID = SECSW.SECURITY_ERROR_ID "
+		+ "INNER JOIN SOFTWARE_WEAKNESS SW ON SW.ID = SECSW.SOFTWARE_WEAKNESS_ID "
+		+ "WHERE SECSW.SECURITY_ERROR_ID = ?", softwareWeaknessManager.getSecurityErrorId());
+		
+		List<SoftwareWeakness> swList = new ArrayList<>();
+		
+		list.forEach(m -> {
+			SoftwareWeakness sw = new SoftwareWeakness("" + (int) m.get("SOFTWARE WEAKNESS ID"), (String) m.get("SOFTWARE WEAKNESS DESCRIPTION")); 
+			swList.add(sw);
+		});
+		
+		mnv.addObject("result", swList);
+		
+		mnv.addObject("softwareWeaknessManager", new SoftwareWeaknessManager("" + se.getId(), se.getDescription(), "-1", "", "E"));
+		
+		list = jdbcTemplate.queryForList("SELECT SW.ID, SW.DESCRIPTION "
+		+ "FROM SOFTWARE_WEAKNESS AS SW "
+		+ "WHERE SW.ID NOT IN (SELECT SECSW.SOFTWARE_WEAKNESS_ID FROM SECURITY_ERROR_CAUSES_SOFTWARE_WEAKNESS AS SECSW WHERE SECSW.SECURITY_ERROR_ID = ?)", softwareWeaknessManager.getSecurityErrorId());
+		
+		List<SoftwareWeakness> seList2 = new ArrayList<>();
+		
+		list.forEach(m -> {
+			SoftwareWeakness sw = new SoftwareWeakness("" + (int) m.get("ID"), (String) m.get("DESCRIPTION")); 
+			seList2.add(sw);
+		});
+		
+		mnv.addObject("softwareWeaknessList", seList2);
 		
 		return mnv;
 	}

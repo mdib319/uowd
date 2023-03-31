@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 
+<%@page import="org.uowd.sskrs.models.SoftwareWeakness"%>
 <%@page import="java.util.ArrayList"%>
 <%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core"%>
 <%@ page language="java" contentType="text/html; charset=UTF-8"
@@ -9,6 +10,8 @@
 <%@ page import="org.uowd.sskrs.models.SecurityRequirement"%>
 <%@ page import="org.uowd.sskrs.models.SecurityErrorManager" %>
 <%@ page import="org.uowd.sskrs.models.SecurityError" %>
+<%@ page import="org.uowd.sskrs.models.SoftwareWeaknessManager" %>
+<%@ page import="org.uowd.sskrs.models.SoftwareWeakness" %>
 <%@ page import="java.util.List"%>
 
 
@@ -17,15 +20,15 @@
 <meta charset="UTF-8">
 <link rel="stylesheet" href="/sskrs/resources/css/all.css" />
 <script src="/sskrs/resources/js/jquery-3.6.0.min.js"></script>
-<title>Manage Security Errors</title>
+<title>Manage Software Weaknesses</title>
 </head>
 <body style="background-color: #E6E6FA;">
 	
 	<a href="/sskrs/security-acquisition"><img align="middle" src="/sskrs/resources/images/uowd-logo.png" /></a> 
-	<h1>Manage Security Errors</h1>
+	<h1>Manage Software Weaknesses</h1>
 	
 	<div>
-		<p><strong>Security Requirement:</strong> <c:out value="${securityRequirement.description}" /></p>
+		<p><strong>Security Error:</strong> <c:out value="${securityError.description}" /></p>
 	</div>
 	
 	<hr />
@@ -41,29 +44,29 @@
 		</c:choose>
 	</div>
 	
-	<form:form action="/sskrs/security-acquisition/mse/manage?action=add" method="POST" modelAttribute="securityErrorManager">
-		<form:hidden path="securityRequirementId" />
+	<form:form action="/sskrs/security-acquisition/msw/manage?action=add" method="POST" modelAttribute="softwareWeaknessManager">
+		<form:hidden path="securityErrorId" />
 		<table>
 			<tbody>
 				<tr>
-					<td><form:radiobutton path="securityErrorNewSecurityRequirment" value="E" label="Select Existing Security Error" /></td>
+					<td><form:radiobutton path="softwareWeaknessNewSoftwareWeakness" value="E" label="Select Existing Software Weakness" /></td>
 				</tr>
 				<tr>
 					<td>
-						&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<form:select path="securityErrorId" style="width: 300px;">
+						&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<form:select path="softwareWeaknessId" style="width: 300px;">
 							<form:option value="" selected="true">Please Select..</form:option>							
-							<c:forEach var="se" items="${securityErrorList}">  
-								<form:option value="${se.id}" label="${se.description}" title="${se.description}" />  
+							<c:forEach var="sw" items="${softwareWeaknessList}">  
+								<form:option value="${sw.id}" label="${sw.description}" title="${sw.description}" />  
 							</c:forEach>
 						</form:select>
 					</td>
 				</tr>
 				<tr>
-					<td><form:radiobutton path="securityErrorNewSecurityRequirment" value="N" label="Add New Security Error" /></td>
+					<td><form:radiobutton path="softwareWeaknessNewSoftwareWeakness" value="N" label="Add New Software Weakness" /></td>
 				</tr>
 				<tr>
 					<td>
-						&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<form:input path="securityErrorDescription" size="38" />
+						&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<form:input path="softwareWeaknessDescription" size="38" />
 					</td>
 				</tr>
 				<tr>
@@ -85,30 +88,25 @@
 		<table class="styled-table">
 			<thead>
 				<tr>
-					<th>Security Error</th>
+					<th>Software Weakness</th>
 					<th>Action</th>
 				</tr>
 			</thead>
 			<tbody id="myTable">
 				<%
-					SecurityRequirement sr = (SecurityRequirement) request.getAttribute("securityRequirement");
+					SecurityError se = (SecurityError) request.getAttribute("securityError");
 				
-					List<SecurityError> seList = (ArrayList<SecurityError>) request.getAttribute("result");
+					List<SoftwareWeakness> swList = (ArrayList<SoftwareWeakness>) request.getAttribute("result");
 					
-					for(SecurityError se : seList)
+					for(SoftwareWeakness sw : swList)
 					{
 						out.print("<tr>");
-						out.print("<td>" + se.getDescription() + "</td>");
-						out.print("<td>");						
+						out.print("<td>" + sw.getDescription() + "</td>");
+						out.print("<td>");
 						
-						out.print("<form method=\"POST\" action=\"/sskrs/security-acquisition/msw/manage\" modelAttribute=\"softwareWeaknessManager\" target=\"_blank\">");						
-						out.print("<input type=\"hidden\" id=\"securityErrorId\" name=\"securityErrorId\" value=\"" + se.getId() + "\" />");						
-						out.print("<input type=\"submit\" value=\"Manage Software Weaknesses\" />");						
-						out.print("</form>");
-						
-						out.print("<form method=\"POST\" action=\"/sskrs/security-acquisition/mse/manage?action=delete\" modelAttribute=\"securityErrorManager\">");
-						out.print("<input type=\"hidden\" id=\"securityRequirementId\" name=\"securityRequirementId\" value=\"" + sr.getId() + "\" />");
-						out.print("<input type=\"hidden\" id=\"securityErrorId\" name=\"securityErrorId\" value=\"" + se.getId() + "\" />");						
+						out.print("<form method=\"POST\" action=\"/sskrs/security-acquisition/msw/manage?action=delete\" modelAttribute=\"softwareWeaknessManager\">");
+						out.print("<input type=\"hidden\" id=\"securityErrorId\" name=\"securityErrorId\" value=\"" + se.getId() + "\" />");
+						out.print("<input type=\"hidden\" id=\"softwareWeaknessId\" name=\"softwareWeaknessId\" value=\"" + sw.getId() + "\" />");						
 						out.print("<input type=\"submit\" value=\"Remove\" />");
 						out.print("</form>");
 						
