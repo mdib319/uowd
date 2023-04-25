@@ -26,10 +26,14 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.ModelAndView;
+import org.uowd.sskrs.models.ConstructionPractice;
+import org.uowd.sskrs.models.ConstructionPracticeManager;
 import org.uowd.sskrs.models.IdentificationRequest;
 import org.uowd.sskrs.models.ImplementationRequest;
 import org.uowd.sskrs.models.SecurityError;
@@ -1555,9 +1559,71 @@ public class MainController {
 		return mnv;
 	}
 
-	@GetMapping(path = "/security-acquisition/mcp")
-	public ModelAndView manageContructionPracticeView() {
-		return new ModelAndView("mcp");
+	@RequestMapping(path = "/security-acquisition/mcp", method = {RequestMethod.GET, RequestMethod.POST})
+	public ModelAndView manageContructionPracticeView(@ModelAttribute("constructionPracticeManager") ConstructionPracticeManager constructionPracticeManager, 
+			@RequestParam(name = "action", defaultValue = "init", required = false) String action, HttpServletRequest request) {
+		
+		ModelAndView mnv = new ModelAndView("mcp");
+		
+		
+		
+		
+		
+		
+		List<Map<String,Object>> list = jdbcTemplate.queryForList("SELECT [ID], [DESCRIPTION] FROM [SSKMS].[dbo].[SOFTWARE_FEATURE]");        
+        List<SoftwareFeature> sfList = new ArrayList<>();        
+        list.forEach(m -> {               
+        	SoftwareFeature sf = new SoftwareFeature((int) m.get("ID"), (String) m.get("DESCRIPTION"));
+        	sfList.add(sf);               
+        });
+        
+        mnv.addObject("softwareFeatureList", sfList);
+        
+        List<Map<String,Object>> list2 = jdbcTemplate.queryForList("SELECT [ID],[DESCRIPTION] FROM [SSKMS].[dbo].[CONSTRUCTION_PRACTICE]");
+        
+        List<ConstructionPractice> sfList2 = new ArrayList<>();        
+        list2.forEach(m -> {               
+        	ConstructionPractice cp = new ConstructionPractice((int) m.get("ID"), (String) m.get("DESCRIPTION"));
+        	sfList2.add(cp);               
+        });
+        
+        mnv.addObject("constructionPracticeList", sfList2);
+		
+		return mnv;
+	}
+	
+	@RequestMapping(value = "/security-acquisition/srl/{softwareFeatureId}", method = RequestMethod.GET)
+	public @ResponseBody  List<SecurityRequirement> getSecurityRequirementsList(@PathVariable("softwareFeatureId") String softwareFeatureId) {
+		
+		List<Map<String,Object>> list = jdbcTemplate.queryForList("SELECT SR.ID, SR.DESCRIPTION "
+				+ "FROM SECURITY_REQUIREMENT SR "
+				+ "INNER JOIN SOFTWARE_FEATURE_HAS_SECURITY_REQUIREMENT SFHSR ON SFHSR.SECURITY_REQUIREMENT_ID = SR.ID "
+				+ "WHERE SFHSR.SOFTWARE_FEATURE_ID = ?", softwareFeatureId);
+		
+        List<SecurityRequirement> srList = new ArrayList<>();        
+        list.forEach(m -> {               
+        	SecurityRequirement sr = new SecurityRequirement("" + (int) m.get("ID"), (String) m.get("DESCRIPTION"));
+        	srList.add(sr);
+        });
+        
+	    return srList;
+	}
+	
+	@RequestMapping(value = "/security-acquisition/sel/{securityRequirementId}", method = RequestMethod.GET)
+	public @ResponseBody  List<SecurityError> getSecurityErrorsList(@PathVariable("securityRequirementId") String securityRequirementId) {
+		
+		List<Map<String,Object>> list = jdbcTemplate.queryForList("SELECT SE.ID, SE.DESCRIPTION "
+				+ "FROM SECURITY_ERROR SE "
+				+ "INNER JOIN SECURITY_REQUIREMENT_ASSOCIATED_SECURITY_ERROR SRASE ON SRASE.SECURITY_ERROR_ID = SE.ID " 
+				+ "WHERE SRASE.SECURITY_REQUIREMENT_ID = ?", securityRequirementId);
+		
+        List<SecurityError> seList = new ArrayList<>();        
+        list.forEach(m -> {               
+        	SecurityError se = new SecurityError("" + (int) m.get("ID"), (String) m.get("DESCRIPTION"));
+        	seList.add(se);
+        });
+        
+	    return seList;
 	}
 
 	@GetMapping(path = "/security-acquisition/mvp")
