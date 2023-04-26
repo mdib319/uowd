@@ -12,6 +12,12 @@ public class ConstructionPracticeManager {
 	private String strategyDescription;
 	private String hasMethod;
 	private String methodDetails;
+	private String relatedLanguage;
+	private String language;
+	private String hasMechanism;
+	private String mechanism;
+	private String mechanismUtilizesSecurityTool;
+	private String securityTool;
 	
 	public ConstructionPracticeManager() {
 		super();
@@ -26,11 +32,18 @@ public class ConstructionPracticeManager {
 		this.strategyDescription = "";
 		this.hasMethod = "0";
 		this.methodDetails = "";
+		this.relatedLanguage = "0";
+		this.language = "";
+		this.hasMechanism = "0";
+		this.mechanism = "";
+		this.mechanismUtilizesSecurityTool = "0";
+		this.securityTool = "";
 	}
 
 	public ConstructionPracticeManager(String softwareFeatureId, String securityRequirementId, String securityErrorId, String selectConstructionPractice, 
 			String constructionPracticeId, String constructionPracticeDescription, String followStrategy, String strategyDescription,
-			String hasMethod, String methodDetails) {
+			String hasMethod, String methodDetails, String relatedLanguage, String language, String hasMechanism, String mechanism,
+			String mechanismUtilizesSecurityTool, String securityTool) {
 		super();
 		this.softwareFeatureId = softwareFeatureId;
 		this.securityRequirementId = securityRequirementId;
@@ -42,6 +55,12 @@ public class ConstructionPracticeManager {
 		this.strategyDescription = strategyDescription;
 		this.hasMethod = hasMethod;
 		this.methodDetails = methodDetails;
+		this.relatedLanguage = relatedLanguage;
+		this.language = language;
+		this.hasMechanism = hasMechanism;
+		this.mechanism = mechanism;
+		this.mechanismUtilizesSecurityTool = mechanismUtilizesSecurityTool;
+		this.securityTool = securityTool;
 	}
 
 	public String getSoftwareFeatureId() {
@@ -122,5 +141,53 @@ public class ConstructionPracticeManager {
 
 	public void setMethodDetails(String methodDetails) {
 		this.methodDetails = methodDetails;
+	}
+
+	public String getRelatedLanguage() {
+		return relatedLanguage;
+	}
+
+	public void setRelatedLanguage(String relatedLanguage) {
+		this.relatedLanguage = relatedLanguage;
+	}
+
+	public String getLanguage() {
+		return language;
+	}
+
+	public void setLanguage(String language) {
+		this.language = language;
+	}
+
+	public String getHasMechanism() {
+		return hasMechanism;
+	}
+
+	public void setHasMechanism(String hasMechanism) {
+		this.hasMechanism = hasMechanism;
+	}
+
+	public String getMechanism() {
+		return mechanism;
+	}
+
+	public void setMechanism(String mechanism) {
+		this.mechanism = mechanism;
+	}
+
+	public String getMechanismUtilizesSecurityTool() {
+		return mechanismUtilizesSecurityTool;
+	}
+
+	public void setMechanismUtilizesSecurityTool(String mechanismUtilizesSecurityTool) {
+		this.mechanismUtilizesSecurityTool = mechanismUtilizesSecurityTool;
+	}
+
+	public String getSecurityTool() {
+		return securityTool;
+	}
+
+	public void setSecurityTool(String securityTool) {
+		this.securityTool = securityTool;
 	}
 }

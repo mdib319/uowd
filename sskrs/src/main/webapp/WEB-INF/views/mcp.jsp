@@ -13,6 +13,10 @@
 <meta charset="UTF-8">
 <link rel="stylesheet" href="/sskrs/resources/css/all.css" />
 <script src="/sskrs/resources/js/jquery-3.6.0.min.js"></script>
+
+<link rel="stylesheet" href="/sskrs/resources/summernote/summernote-lite.css" />
+<script src="/sskrs/resources/summernote/summernote-lite.js"></script>
+
 <title>Manage Construction Practices</title>
 </head>
 <body style="background-color: #E6E6FA;">
@@ -72,8 +76,7 @@
 				</tr>
 				<tr>
 					<td>
-						&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<form:label path="constructionPracticeDescription">Construction Description:</form:label>
-						
+						&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<form:label path="constructionPracticeDescription">Construction Description:</form:label>						
 					</td>
 					<td><form:input path="constructionPracticeDescription" size="38" /></td>
 				</tr>
@@ -87,12 +90,30 @@
 					<td>
 						&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<form:checkbox path="hasMethod" value="1"/>Has Method: 
 					</td>
-					<td><form:input path="methodDetails" size="38" /></td>
+					<td style="background-color: #FFFFFF;"><form:textarea path="methodDetails" /></td>					
+				</tr>
+				<tr>
+					<td>
+						&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<form:checkbox path="relatedLanguage" value="1"/>Related Language: 
+					</td>
+					<td><form:input path="language" size="38" /></td>					
+				</tr>
+				<tr>
+					<td>
+						&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<form:checkbox path="hasMechanism" value="1"/>Has Mechanism: 
+					</td>
+					<td><form:input path="mechanism" size="38" /></td>					
+				</tr>
+				<tr>
+					<td>
+						&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<form:checkbox path="mechanismUtilizesSecurityTool" value="1"/>Mechanism utilizes security tool: 
+					</td>
+					<td><form:input path="securityTool" size="38" /></td>					
 				</tr>
 				<tr>
 					<td colspan="2" align="right"><input type="submit"
-						value="Submit" /></td>
-						
+						value="Submit" />
+					</td>						
 				</tr>
 			</tbody>
 		</table>
@@ -100,6 +121,14 @@
 	</form:form>
 
 	<script>
+	
+		$(document).ready(function() {
+			  $('#methodDetails').summernote({
+				  height: 300,
+				  width: 800
+			  });
+		});
+	
 		$("#softwareFeatureId").change(function() {
 			
 			var slctSubcat = $('#securityRequirementId'), slctSubcat1 = $('#securityErrorId'), option = "";
