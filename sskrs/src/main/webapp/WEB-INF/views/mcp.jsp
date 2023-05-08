@@ -24,6 +24,17 @@
 	<a href="/sskrs/security-acquisition"><img align="middle"
 		src="/sskrs/resources/images/uowd-logo.png" /></a>
 	<h1>Manage Construction Practices</h1>
+	
+	<div style="margin-bottom: 10px;">
+		<c:choose>
+			<c:when test="${status == '1'}">
+				<span style="color: green;">${message}</span>
+			</c:when>
+			<c:otherwise>
+				<span style="color: red;">${message}</span>
+			</c:otherwise>
+		</c:choose>
+	</div>
 
 	<form:form action="/sskrs/security-acquisition/mcp" method="POST"
 		modelAttribute="constructionPracticeManager">
@@ -46,6 +57,10 @@
 					<td><form:select path="securityRequirementId"
 							style="width: 500px;">
 							<form:option value="" selected="true">Please Select..</form:option>
+							<c:forEach var="sr" items="${srList}">
+								<form:option value="${sr.id}" label="${sr.description}"
+									title="${sr.description}" />
+							</c:forEach>
 						</form:select></td>
 				</tr>
 				<tr>
@@ -53,6 +68,10 @@
 					<td><form:select path="securityErrorId"
 							style="width: 500px;">
 							<form:option value="" selected="true">Please Select..</form:option>
+							<c:forEach var="se" items="${seList}">
+								<form:option value="${se.id}" label="${se.description}"
+									title="${se.description}" />
+							</c:forEach>
 						</form:select></td>
 				</tr>
 				<tr>
@@ -106,7 +125,7 @@
 				</tr>
 				<tr>
 					<td>
-						&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<form:checkbox path="mechanismUtilizesSecurityTool" value="1"/>Mechanism utilizes security tool: 
+						&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<form:checkbox path="mechanismUtilizesSecurityTool" value="1"/>Mechanism utilizes Security Tool: 
 					</td>
 					<td><form:input path="securityTool" size="38" /></td>					
 				</tr>
@@ -127,77 +146,152 @@
 				  height: 300,
 				  width: 800
 			  });
-		});
-	
-		$("#softwareFeatureId").change(function() {
-			
-			var slctSubcat = $('#securityRequirementId'), slctSubcat1 = $('#securityErrorId'), option = "";
-			
-			slctSubcat.empty();
-			slctSubcat1.empty();
-			
-			option = "<option selected='true' value='''>Please Select..</option>";
-			
-			slctSubcat1.append(option);
-
-			if (!$(this).val()) {
-				slctSubcat.append(option);
-			} else {
-				var softwareFeatureId = $(this).val();
-
-				$.ajax({
-				type : 'GET',
-				url : "/sskrs/security-acquisition/srl/" + softwareFeatureId,
-				success : function(data) {
+			  
+			  $("#softwareFeatureId").change(function() {
 					
-					for (var i = 0; i < data.length; i++) {
-						option = option + "<option value='"+data[i].id + "' title='" + data[i].description + "'>" + data[i].description + "</option>";
-					}
+					var slctSubcat = $('#securityRequirementId'), slctSubcat1 = $('#securityErrorId'), option = "";
 					
-					slctSubcat.append(option);
-				},
-				error : function(xhr, status, error) {
-					  var err = eval("(" + xhr.responseText + ")");
-					  alert(err.Message);
-					}
-
-				});
-			}
-
-		});
-		
-		$("#securityRequirementId").change(function() {
-			
-			var slctSubcat = $('#securityErrorId'), option = "";
-			
-			slctSubcat.empty();
-
-			if (!$(this).val()) {				
-				option = "<option selected='true' value='''>Please Select..</option>";
-				slctSubcat.append(option);				
-			} else {
-				var securityRequirementId = $(this).val();
-
-				$.ajax({
-				type : 'GET',
-				url : "/sskrs/security-acquisition/sel/" + securityRequirementId,
-				success : function(data) {					
+					slctSubcat.empty();
+					slctSubcat1.empty();
+					
 					option = "<option selected='true' value='''>Please Select..</option>";
-
-					for (var i = 0; i < data.length; i++) {
-						option = option + "<option value='"+data[i].id + "' title='" + data[i].description + "'>" + data[i].description + "</option>";
-					}
 					
-					slctSubcat.append(option);
-				},
-				error : function(xhr, status, error) {
-					  var err = eval("(" + xhr.responseText + ")");
-					  alert(err.Message);
+					slctSubcat1.append(option);
+
+					if (!$(this).val()) {
+						slctSubcat.append(option);
+					} else {
+						var softwareFeatureId = $(this).val();
+
+						$.ajax({
+						type : 'GET',
+						url : "/sskrs/security-acquisition/srl/" + softwareFeatureId,
+						success : function(data) {
+							
+							for (var i = 0; i < data.length; i++) {
+								option = option + "<option value='"+data[i].id + "' title='" + data[i].description + "'>" + data[i].description + "</option>";
+							}
+							
+							slctSubcat.append(option);
+						},
+						error : function(xhr, status, error) {
+							  var err = eval("(" + xhr.responseText + ")");
+							  alert(err.Message);
+							}
+
+						});
 					}
 
 				});
-			}
+				
+				$("#securityRequirementId").change(function() {
+					
+					var slctSubcat = $('#securityErrorId'), option = "";
+					
+					slctSubcat.empty();
 
+					if (!$(this).val()) {				
+						option = "<option selected='true' value='''>Please Select..</option>";
+						slctSubcat.append(option);				
+					} else {
+						var securityRequirementId = $(this).val();
+
+						$.ajax({
+						type : 'GET',
+						url : "/sskrs/security-acquisition/sel/" + securityRequirementId,
+						success : function(data) {					
+							option = "<option selected='true' value='''>Please Select..</option>";
+
+							for (var i = 0; i < data.length; i++) {
+								option = option + "<option value='"+data[i].id + "' title='" + data[i].description + "'>" + data[i].description + "</option>";
+							}
+							
+							slctSubcat.append(option);
+						},
+						error : function(xhr, status, error) {
+							  var err = eval("(" + xhr.responseText + ")");
+							  alert(err.Message);
+							}
+
+						});
+					}
+
+				});
+				
+				$("input[name=selectConstructionPractice]").change(function () {			
+					
+					if(this.value == 'N')
+					{
+						disableAllFields(false);	
+					}
+					else if(this.value == 'E')
+					{
+						disableAllFields(true);
+					}
+				});
+				
+				$("#followStrategy1").change(function () {
+					
+					$("#strategyDescription").prop('disabled', !this.checked);
+				});
+				
+				$("#hasMethod1").change(function () {
+					
+					$("#methodDetails").summernote((!this.checked) ? 'disable' : 'enable');
+					$("#relatedLanguage1").prop('disabled', !this.checked);
+					$("#hasMechanism1").prop('disabled', !this.checked);
+					
+					$("#language").prop('disabled', !this.checked || !$("#relatedLanguage1").is(':checked'));
+					
+					$("#mechanism").prop('disabled', !this.checked || !$("#hasMechanism1").is(':checked'));
+					
+					$("#mechanismUtilizesSecurityTool1").prop('disabled', !this.checked || !$("#hasMechanism1").is(':checked'));
+					$("#securityTool").prop('disabled', !this.checked || !$("#hasMechanism1").is(':checked') || !$("#mechanismUtilizesSecurityTool1").is(':checked'));
+				});
+				
+				$("#relatedLanguage1").change(function () {
+					
+					$("#language").prop('disabled', !this.checked);
+				});
+				
+				$("#hasMechanism1").change(function () {
+					
+					$("#mechanism").prop('disabled', !this.checked);				
+					$("#mechanismUtilizesSecurityTool1").prop('disabled', !this.checked);
+				});
+				
+				$("#mechanismUtilizesSecurityTool1").change(function () {
+					
+					$("#securityTool").prop('disabled', !this.checked);
+				});
+				
+				function disableAllFields(disable)
+				{
+					$("#constructionPracticeId").prop('disabled', !disable);
+					$("#constructionPracticeDescription").prop('disabled', disable);
+					$("#followStrategy1").prop('disabled', disable);					
+					$("#hasMethod1").prop('disabled', disable);
+					$("#relatedLanguage1").prop('disabled', disable || !$("#hasMethod1").is(':checked'));
+					$("#hasMechanism1").prop('disabled', disable || !$("#hasMethod1").is(':checked'));
+					
+					$("#strategyDescription").prop('disabled', disable || !$("#followStrategy1").is(':checked'));
+					$("#language").prop('disabled', disable || !$("#relatedLanguage1").is(':checked'));
+					$("#mechanism").prop('disabled', disable || !$("#hasMechanism1").is(':checked'));				
+					$("#mechanismUtilizesSecurityTool1").prop('disabled', disable || !$("#hasMethod1").is(':checked') || !$("#hasMechanism1").is(':checked'));
+					$("#securityTool").prop('disabled', disable || !$("#hasMethod1").is(':checked') || !$("#hasMechanism1").is(':checked') || !$("#mechanismUtilizesSecurityTool1").is(':checked'));
+					$("#methodDetails").summernote((disable || !$("#hasMethod1").is(':checked')) ? 'disable' : 'enable');
+				}
+				
+				var selectConPrac = $("input[name=selectConstructionPractice]:checked");
+				
+				if(selectConPrac.val() == 'N')
+				{
+					disableAllFields(false);	
+				}
+				else if(selectConPrac.val() == 'E')
+				{
+					disableAllFields(true);
+				}
 		});
 	</script>
 

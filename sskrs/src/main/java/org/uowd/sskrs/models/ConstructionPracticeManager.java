@@ -190,4 +190,18 @@ public class ConstructionPracticeManager {
 	public void setSecurityTool(String securityTool) {
 		this.securityTool = securityTool;
 	}
+
+	@Override
+	public String toString() {
+		return "ConstructionPracticeManager [softwareFeatureId=" + softwareFeatureId + ", securityRequirementId="
+				+ securityRequirementId + ", securityErrorId=" + securityErrorId + ", selectConstructionPractice="
+				+ selectConstructionPractice + ", constructionPracticeId=" + constructionPracticeId
+				+ ", constructionPracticeDescription=" + constructionPracticeDescription + ", followStrategy="
+				+ followStrategy + ", strategyDescription=" + strategyDescription + ", hasMethod=" + hasMethod
+				+ ", methodDetails=" + methodDetails + ", relatedLanguage=" + relatedLanguage + ", language=" + language
+				+ ", hasMechanism=" + hasMechanism + ", mechanism=" + mechanism + ", mechanismUtilizesSecurityTool="
+				+ mechanismUtilizesSecurityTool + ", securityTool=" + securityTool + "]";
+	}
+	
+	
 }

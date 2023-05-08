@@ -1560,15 +1560,225 @@ public class MainController {
 	}
 
 	@RequestMapping(path = "/security-acquisition/mcp", method = {RequestMethod.GET, RequestMethod.POST})
-	public ModelAndView manageContructionPracticeView(@ModelAttribute("constructionPracticeManager") ConstructionPracticeManager constructionPracticeManager, 
-			@RequestParam(name = "action", defaultValue = "init", required = false) String action, HttpServletRequest request) {
+	public ModelAndView manageContructionPracticeView(@ModelAttribute("constructionPracticeManager") ConstructionPracticeManager constructionPracticeManager, HttpServletRequest request) {
 		
 		ModelAndView mnv = new ModelAndView("mcp");
 		
+		List<SecurityRequirement> srList = new ArrayList<>();	
+		mnv.addObject("srList", srList);
 		
+		List<SecurityError> seList = new ArrayList<>();		
+		mnv.addObject("seList", seList);
 		
-		
-		
+		if (request.getMethod().equals(RequestMethod.POST.name()))
+		{			
+			if(constructionPracticeManager.getSoftwareFeatureId().contentEquals("-1") || constructionPracticeManager.getSoftwareFeatureId().trim().isEmpty())
+			{
+				mnv.addObject(STATUS, "0");
+    			mnv.addObject(MESSAGE, "Select Software Feature.");
+			}
+			else if(constructionPracticeManager.getSecurityRequirementId().contentEquals("-1") || constructionPracticeManager.getSecurityRequirementId().trim().isEmpty())
+			{
+				mnv.addObject(STATUS, "0");
+    			mnv.addObject(MESSAGE, "Select Security Requirement.");
+    			
+    			constructionPracticeManager.setSoftwareFeatureId("");
+			}
+			else if(constructionPracticeManager.getSecurityErrorId().contentEquals("-1") || constructionPracticeManager.getSecurityErrorId().trim().isEmpty())
+			{
+				mnv.addObject(STATUS, "0");
+    			mnv.addObject(MESSAGE, "Select Security Error.");
+    			
+    			constructionPracticeManager.setSoftwareFeatureId("");
+    			constructionPracticeManager.setSecurityRequirementId("");
+			}
+			else
+			{
+				boolean error = false;
+				
+				if(constructionPracticeManager.getSelectConstructionPractice().contentEquals("E"))
+				{
+					if(constructionPracticeManager.getConstructionPracticeId().contentEquals("-1") || constructionPracticeManager.getConstructionPracticeId().trim().isEmpty())
+					{
+						mnv.addObject(STATUS, "0");
+		    			mnv.addObject(MESSAGE, "Select an existing Construction Practice.");
+					}
+					else
+					{
+						//SOFTWARE_FEATURE_HAS_CONSTRUCTION_PRACTICE
+						//SECURITY_REQUIREMENT_FOLLOWED_BY_CONSTRUCTION_PRACTICE
+						//SECURITY_ERROR_MITIGATED_BY_CONSTRUCTION_PRACTICE
+					}
+				}
+				else if(constructionPracticeManager.getSelectConstructionPractice().contentEquals("N"))
+				{
+					if(constructionPracticeManager.getConstructionPracticeDescription().trim().isEmpty())
+					{
+						mnv.addObject(STATUS, "0");
+		    			mnv.addObject(MESSAGE, "Construction Practice description may not be empty.");
+					}
+					else if(constructionPracticeManager.getFollowStrategy() == null && constructionPracticeManager.getHasMethod() == null)
+					{
+						mnv.addObject(STATUS, "0");
+		    			mnv.addObject(MESSAGE, "Either a strategy and/or a method should be provided.");
+					}
+					else if(constructionPracticeManager.getFollowStrategy() != null && constructionPracticeManager.getStrategyDescription().trim().isEmpty())
+					{
+						mnv.addObject(STATUS, "0");
+		    			mnv.addObject(MESSAGE, "Strategy description may not be empty.");
+					}
+					else if(constructionPracticeManager.getHasMethod() != null && (constructionPracticeManager.getMethodDetails().trim().isEmpty()))
+					{
+						mnv.addObject(STATUS, "0");
+		    			mnv.addObject(MESSAGE, "Method details may not be empty.");
+					}
+					else if(constructionPracticeManager.getRelatedLanguage() != null && constructionPracticeManager.getLanguage().trim().isEmpty())
+					{
+						mnv.addObject(STATUS, "0");
+		    			mnv.addObject(MESSAGE, "Language may not be empty.");
+					}
+					else if(constructionPracticeManager.getHasMechanism() != null && constructionPracticeManager.getMechanism().trim().isEmpty())
+					{
+						mnv.addObject(STATUS, "0");
+		    			mnv.addObject(MESSAGE, "Mechanism may not be empty.");
+					}
+					else if(constructionPracticeManager.getMechanismUtilizesSecurityTool() != null && constructionPracticeManager.getSecurityTool().trim().isEmpty())
+					{
+						mnv.addObject(STATUS, "0");
+		    			mnv.addObject(MESSAGE, "Security Tool may not be empty.");
+					}
+					else
+					{
+						int rows;
+						
+						String cpInsert = "DECLARE @INSERTED_TABLE TABLE (ID INT);"
+										+ "DECLARE @CONSTRUCTION_PRACTICE_ID INT;"
+										+ "INSERT INTO [dbo].[CONSTRUCTION_PRACTICE] ([DESCRIPTION]) OUTPUT INSERTED.ID INTO @INSERTED_TABLE VALUES (?);"
+										+ "SELECT @CONSTRUCTION_PRACTICE_ID = ID FROM @INSERTED_TABLE;"
+										+ "SELECT @CONSTRUCTION_PRACTICE_ID AS 'CONSTRUCTION PRACTICE ID';";
+						
+						int cpId = jdbcTemplate.queryForObject(cpInsert, (rs, rowNum) -> rs.getInt("CONSTRUCTION PRACTICE ID"), constructionPracticeManager.getConstructionPracticeDescription());
+						
+						if(constructionPracticeManager.getFollowStrategy() != null)
+						{
+							String fsInsert = "DECLARE @INSERTED_TABLE TABLE (ID INT);"
+									+ "DECLARE @STRATEGY_ID INT;"
+									+ "INSERT INTO [dbo].[STRATEGY] ([DESCRIPTION]) OUTPUT INSERTED.ID INTO @INSERTED_TABLE VALUES (?);"
+									+ "SELECT @STRATEGY_ID = ID FROM @INSERTED_TABLE;"
+									+ "SELECT @STRATEGY_ID AS 'STRATEGY ID';";
+							
+							int fsId = jdbcTemplate.queryForObject(fsInsert, (rs, rowNum) -> rs.getInt("STRATEGY ID"), constructionPracticeManager.getStrategyDescription());
+							
+							rows = jdbcTemplate.update("INSERT INTO [dbo].[CONSTRUCTION_PRACTICE_FOLLOWS_STRATEGY] ([CONSTRUCTION_PRACTICE_ID], [STRATEGY_ID]) VALUES (?, ?)", cpId, fsId);
+							
+							if(rows != 1)
+							{
+								error = true;
+							}
+						}
+						
+						if(constructionPracticeManager.getHasMethod() != null)
+						{
+							String mInsert = "DECLARE @INSERTED_TABLE TABLE (ID INT);"
+									+ "DECLARE @METHOD_ID INT;"
+									+ "INSERT INTO [dbo].[METHOD] ([DESCRIPTION]) OUTPUT INSERTED.ID INTO @INSERTED_TABLE VALUES (?);"
+									+ "SELECT @METHOD_ID = ID FROM @INSERTED_TABLE;" 
+									+ "SELECT @METHOD_ID AS 'METHOD ID';";
+							
+							int mId = jdbcTemplate.queryForObject(mInsert, (rs, rowNum) -> rs.getInt("METHOD ID"), constructionPracticeManager.getMethodDetails());
+							
+							rows = jdbcTemplate.update("INSERT INTO [dbo].[CONSTRUCTION_PRACTICE_HAS_METHOD] ([CONSTRUCTION_PRACTICE_ID], [METHOD_ID]) VALUES (?, ?)", cpId, mId);
+							
+							if(rows != 1)
+							{
+								error = true;
+							}
+							
+							if(constructionPracticeManager.getRelatedLanguage() != null)
+							{
+								String lInsert = "DECLARE @INSERTED_TABLE TABLE (ID INT);"
+										+ "DECLARE @LANGUAGE_ID INT;"
+										+ "INSERT INTO [dbo].[LANGUAGE] ([DESCRIPTION]) OUTPUT INSERTED.ID INTO @INSERTED_TABLE VALUES (?);"
+										+ "SELECT @LANGUAGE_ID = ID FROM @INSERTED_TABLE;"
+										+ "SELECT @LANGUAGE_ID AS 'LANGUAGE ID';";
+								
+								int lId = jdbcTemplate.queryForObject(lInsert, (rs, rowNum) -> rs.getInt("LANGUAGE ID"), constructionPracticeManager.getLanguage());
+								
+								rows = jdbcTemplate.update("INSERT INTO [dbo].[METHOD_RELATED_LANGUAGE] ([METHOD_ID], [LANGUAGE_ID]) VALUES (?, ?)", mId, lId);
+								
+								if(rows != 1)
+								{
+									error = true;
+								}
+							}
+							
+							if(constructionPracticeManager.getHasMechanism() != null)
+							{
+								String mechInsert = "DECLARE @INSERTED_TABLE TABLE (ID INT);"
+										+ "DECLARE @MECHANISM_ID INT;"
+										+ "INSERT INTO [dbo].[MECHANISM] ([DESCRIPTION]) OUTPUT INSERTED.ID INTO @INSERTED_TABLE VALUES (?);"
+										+ "SELECT @MECHANISM_ID = ID FROM @INSERTED_TABLE;"
+										+ "SELECT @MECHANISM_ID AS 'MECHANISM ID';";
+								
+								int mechId = jdbcTemplate.queryForObject(mechInsert, (rs, rowNum) -> rs.getInt("MECHANISM ID"), constructionPracticeManager.getMechanism());
+								
+								rows = jdbcTemplate.update("INSERT INTO [dbo].[METHOD_HAS_MECHANISM] ([METHOD_ID], [MECHANISM_ID]) VALUES (?, ?)", mId, mechId);
+								
+								if(rows != 1)
+								{
+									error = true;
+								}
+								
+								if(constructionPracticeManager.getMechanismUtilizesSecurityTool() != null)
+								{
+									String sInsert = "DECLARE @INSERTED_TABLE TABLE (ID INT);"
+											+ "DECLARE @SECURITY_TOOL_ID INT;"
+											+ "INSERT INTO [dbo].[SECURITY_TOOL] ([DESCRIPTION]) OUTPUT INSERTED.ID INTO @INSERTED_TABLE VALUES (?);"
+											+ "SELECT @SECURITY_TOOL_ID = ID FROM @INSERTED_TABLE;"
+											+ "SELECT @SECURITY_TOOL_ID AS 'SECURITY TOOL ID';";
+									
+									int sId = jdbcTemplate.queryForObject(sInsert, (rs, rowNum) -> rs.getInt("SECURITY TOOL ID"), constructionPracticeManager.getSecurityTool());
+									
+									rows = jdbcTemplate.update("INSERT INTO [dbo].[MECHANISM_UTILIZES_SECURITY_TOOL] ([MECHANISM_ID], [SECURITY_TOOL_ID]) VALUES (?, ?)", mechId, sId);
+									
+									if(rows != 1)
+									{
+										error = true;
+									}
+								}
+							}
+						}
+					}
+				}
+				
+				
+				
+				if(!error)
+				{
+					mnv.addObject(STATUS, "1");
+	    			mnv.addObject(MESSAGE, "Construction Practice inserted successfully.");
+				}
+				else
+				{
+					mnv.addObject(STATUS, "0");
+	    			mnv.addObject(MESSAGE, "An error occurred while inserting the Construction Practice.");
+				}
+			}
+			
+			if(!constructionPracticeManager.getSoftwareFeatureId().contentEquals("-1") && !constructionPracticeManager.getSoftwareFeatureId().trim().isEmpty())
+			{
+				srList = getSecurityRequirementsList(constructionPracticeManager.getSoftwareFeatureId());
+				
+				mnv.addObject("srList", srList);
+			}
+			
+			if(!constructionPracticeManager.getSecurityRequirementId().contentEquals("-1") && !constructionPracticeManager.getSecurityRequirementId().trim().isEmpty())
+			{
+				seList = getSecurityErrorsList(constructionPracticeManager.getSecurityRequirementId());
+				
+				mnv.addObject("seList", seList);
+			}
+		}
 		
 		List<Map<String,Object>> list = jdbcTemplate.queryForList("SELECT [ID], [DESCRIPTION] FROM [SSKMS].[dbo].[SOFTWARE_FEATURE]");        
         List<SoftwareFeature> sfList = new ArrayList<>();        
