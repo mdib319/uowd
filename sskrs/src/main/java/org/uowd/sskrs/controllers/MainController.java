@@ -1,10 +1,5 @@
 package org.uowd.sskrs.controllers;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -12,14 +7,6 @@ import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
 import javax.sql.DataSource;
 
-import org.apache.jena.query.Query;
-import org.apache.jena.query.QueryExecution;
-import org.apache.jena.query.QueryExecutionFactory;
-import org.apache.jena.query.QueryFactory;
-import org.apache.jena.query.QuerySolution;
-import org.apache.jena.query.ResultSet;
-import org.apache.jena.rdf.model.Model;
-import org.apache.jena.rdf.model.ModelFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.dao.EmptyResultDataAccessException;
@@ -56,8 +43,6 @@ public class MainController {
 	private static final String STATUS = "status";
 	private static final String MESSAGE = "message";
 
-	private static final String KNOWLEDGE_REPOSITORY_PATH = "C:\\owl\\KnowledgeGraph.owl";
-
 	private JdbcTemplate jdbcTemplate;
 
 	@Autowired
@@ -73,136 +58,53 @@ public class MainController {
 
 	@RequestMapping(value = "/s-scrum-utilities/security-identification", method = { RequestMethod.GET, RequestMethod.POST })
 	public ModelAndView securityIdentificationView(HttpServletRequest httpRequest,
-			@ModelAttribute("request") IdentificationRequest request) {
+			@ModelAttribute("identificationRequest") IdentificationRequest identificationRequest) {
+		
 		ModelAndView mv = new ModelAndView("security-identification");
+		
+		List<Map<String,Object>> list = jdbcTemplate.queryForList("SELECT [ID], [DESCRIPTION] FROM [SSKMS].[dbo].[SOFTWARE_PARADIGM]");        
+        List<SoftwareParadigm> spList = new ArrayList<>();        
+        list.forEach(m -> {               
+        	SoftwareParadigm sp = new SoftwareParadigm((int) m.get("ID"), (String) m.get("DESCRIPTION"));
+        	spList.add(sp);               
+        });
+        
+        mv.addObject("softwareParadigmList", spList);
+        
+        List<Map<String,Object>> list2 = jdbcTemplate.queryForList("SELECT [ID], [DESCRIPTION] FROM [SSKMS].[dbo].[SUBJECT_AREA]");        
+        List<SubjectArea> spList2 = new ArrayList<>();        
+        list2.forEach(m -> {               
+        	SubjectArea sa = new SubjectArea((int) m.get("ID"), (String) m.get("DESCRIPTION"));
+        	spList2.add(sa);
+        });
+        
+        mv.addObject("subjectAreaList", spList2);
 
-		StringBuilder sparqlStatement;
-		Query query;
-		QueryExecution qe;
-		ResultSet results;
-
-		List<String> paradigms = new ArrayList<>();
-		List<String> applications = new ArrayList<>();
-		List<String> subjects = new ArrayList<>();
-
-		try (InputStream in = new FileInputStream(new File(KNOWLEDGE_REPOSITORY_PATH))) {
-			Model model = ModelFactory.createDefaultModel();
-			model.read(in, null, "TURTLE");
-
-			sparqlStatement = new StringBuilder();
-			sparqlStatement.append(getSparqlHeader());
-			sparqlStatement.append("SELECT ?x WHERE { ?x rdf:type :SoftwareParadigm }");
-
-			query = QueryFactory.create(sparqlStatement.toString());
-			qe = QueryExecutionFactory.create(query, model);
-			results = qe.execSelect();
-
-			while (results.hasNext()) {
-				paradigms.add(results.next().get("?x").asResource().getLocalName());
-			}
-
-			qe.close();
-
-			sparqlStatement = new StringBuilder();
-			sparqlStatement.append(getSparqlHeader());
-			sparqlStatement.append("SELECT ?x WHERE { ?x rdf:type :Application }");
-
-			query = QueryFactory.create(sparqlStatement.toString());
-
-			qe = QueryExecutionFactory.create(query, model);
-
-			results = qe.execSelect();
-
-			while (results.hasNext()) {
-				applications.add(results.next().get("?x").asResource().getLocalName());
-			}
-
-			qe.close();
-
-			sparqlStatement = new StringBuilder();
-			sparqlStatement.append(getSparqlHeader());
-			sparqlStatement.append("SELECT ?x WHERE { ?x rdf:type :SubjectArea }");
-
-			query = QueryFactory.create(sparqlStatement.toString());
-
-			qe = QueryExecutionFactory.create(query, model);
-
-			results = qe.execSelect();
-
-			while (results.hasNext()) {
-				subjects.add(results.next().get("?x").asResource().getLocalName());
-			}
-
-			qe.close();
-		} catch (FileNotFoundException e) {
-			e.printStackTrace();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-
-		mv.addObject("paradigms", constructHtmlDropDownList("paradigm", paradigms, true));
-		mv.addObject("applications", constructHtmlDropDownList("application", applications, false));
-		mv.addObject("subjects", constructHtmlDropDownList("subject", subjects, true));
-
-		if (httpRequest.getMethod().contentEquals("POST")) {
+		if (httpRequest.getMethod().contentEquals("POST")) 
+		{
 			StringBuilder result = new StringBuilder();
 
-			try (InputStream in = new FileInputStream(new File(KNOWLEDGE_REPOSITORY_PATH))) {
-				Model model = ModelFactory.createDefaultModel();
-				model.read(in, null, "TURTLE");
-
-				sparqlStatement = new StringBuilder();
-				sparqlStatement.append(getSparqlHeader());
-				sparqlStatement.append("SELECT * ");
-				sparqlStatement.append("WHERE { ");
-
-				sparqlStatement.append("?SoftwareParadigm rdf:type :SoftwareParadigm .");
-				sparqlStatement.append("?Application rdf:type :Application .");
-				sparqlStatement.append("?SubjectArea rdf:type :SubjectArea .");
-
-				sparqlStatement.append("?SoftwareParadigm :hasSwFeature ?SoftwareFeature .");
-				sparqlStatement.append("?Application :hasSwFeature ?SoftwareFeature .");
-				sparqlStatement.append("?SubjectArea :hasSwFeature ?SoftwareFeature .");
-				sparqlStatement.append("?SoftwareFeature :hasSecReq ?SecurityRequirment .");
-				sparqlStatement.append("?SecurityRequirment :associatedError ?SecurityError .");
-				sparqlStatement.append("?SecurityError :causes ?SoftwareWeakness .");
-
-				sparqlStatement.append(
-						"FILTER regex(str(?SoftwareParadigm), str(\"^http://www.uowd.org/ontologies/2021/sscrum/softwaresecurity#")
-						.append(request.getParadigm()).append("$\"), 'i') .");
-				sparqlStatement.append(
-						"FILTER regex(str(?Application), str(\"^http://www.uowd.org/ontologies/2021/sscrum/softwaresecurity#")
-						.append(request.getApplication()).append("$\"), 'i') .");
-				sparqlStatement.append(
-						"FILTER regex(str(?SubjectArea), str(\"^http://www.uowd.org/ontologies/2021/sscrum/softwaresecurity#")
-						.append(request.getSubject()).append("$\"), 'i')");
-				sparqlStatement.append("} ");
-				sparqlStatement.append("ORDER BY ASC(?SoftwareFeature) ASC(?SecurityRequirment) ");
-
-				query = QueryFactory.create(sparqlStatement.toString());
-				qe = QueryExecutionFactory.create(query, model);
-				results = qe.execSelect();
-
-				while (results.hasNext()) {
-					QuerySolution q = results.next();
-
-					result.append("<tr>");
-					result.append("<td>").append(q.get("?SoftwareFeature").asResource().getLocalName()).append("</td>");
-					result.append("<td>").append(q.get("?SecurityRequirment").asResource().getLocalName())
-							.append("</td>");
-					result.append("<td>").append(q.get("?SecurityError").asResource().getLocalName()).append("</td>");
-					result.append("<td>").append(q.get("?SoftwareWeakness").asResource().getLocalName())
-							.append("</td>");
-					result.append("</tr>");
-				}
-
-				qe.close();
-			} catch (FileNotFoundException e) {
-				e.printStackTrace();
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
-
+			List<Map<String,Object>> list3 = jdbcTemplate.queryForList("SELECT SF.DESCRIPTION AS 'SOFTWARE FEATURE', SR.DESCRIPTION AS 'SECURITY REQUIREMENT', SE.DESCRIPTION AS 'SECURITY ERROR', SW.DESCRIPTION AS 'VULNERABILITY' "
+					+ "FROM SOFTWARE_FEATURE AS SF "
+					+ "INNER JOIN SOFTWARE_PARADIGM_HAS_SOFTWARE_FEATURE SPHSF ON SPHSF.SOFTWARE_FEATURE_ID = SF.ID "
+					+ "INNER JOIN SUBJECT_AREA_HAS_SOFTWARE_FEATURE SAHSF ON SAHSF.SOFTWARE_FEATURE_ID = SF.ID "
+					+ "INNER JOIN SOFTWARE_FEATURE_HAS_SECURITY_REQUIREMENT SFHSR ON SFHSR.SOFTWARE_FEATURE_ID = SF.ID "
+					+ "INNER JOIN SECURITY_REQUIREMENT SR ON SR.ID = SFHSR.SECURITY_REQUIREMENT_ID "
+					+ "INNER JOIN SECURITY_REQUIREMENT_ASSOCIATED_SECURITY_ERROR SRASE ON SRASE.SECURITY_REQUIREMENT_ID = SFHSR.SECURITY_REQUIREMENT_ID "
+					+ "INNER JOIN SECURITY_ERROR SE ON SE.ID = SRASE.SECURITY_ERROR_ID "
+					+ "INNER JOIN SECURITY_ERROR_CAUSES_SOFTWARE_WEAKNESS SECSW ON SECSW.SECURITY_ERROR_ID = SE.ID "
+					+ "INNER JOIN SOFTWARE_WEAKNESS SW ON SW.ID = SECSW.SOFTWARE_WEAKNESS_ID "
+					+ "WHERE SPHSF.SOFTWARE_PARADIGM_ID = ? AND SAHSF.SUBJECT_AREA_ID = ?", identificationRequest.getSoftwareParadigmId(), identificationRequest.getSubjectAreaId());
+			
+			list3.forEach(m -> {
+				result.append("<tr>");
+				result.append("<td>").append(m.get("SOFTWARE FEATURE")).append("</td>");
+				result.append("<td>").append(m.get("SECURITY REQUIREMENT")).append("</td>");
+				result.append("<td>").append(m.get("SECURITY ERROR")).append("</td>");
+				result.append("<td>").append(m.get("VULNERABILITY")).append("</td>");
+				result.append("</tr>");
+	        });
+		
 			mv.addObject("result", result.toString());
 		}
 
@@ -211,191 +113,61 @@ public class MainController {
 
 	@RequestMapping(value = "/s-scrum-utilities/security-implementation", method = { RequestMethod.GET, RequestMethod.POST })
 	public ModelAndView securityImplementationView(HttpServletRequest httpRequest,
-			@ModelAttribute("request") ImplementationRequest request) {
+			@ModelAttribute("implementationRequest") ImplementationRequest implementationRequest) {
+		
 		ModelAndView mv = new ModelAndView("security-implementation");
 
-		StringBuilder sparqlStatement;
-		Query query;
-		QueryExecution qe;
-		ResultSet results;
+		List<Map<String,Object>> list = jdbcTemplate.queryForList("SELECT [ID], [DESCRIPTION] FROM [SSKMS].[dbo].[SOFTWARE_PARADIGM]");        
+        List<SoftwareParadigm> spList = new ArrayList<>();        
+        list.forEach(m -> {               
+        	SoftwareParadigm sp = new SoftwareParadigm((int) m.get("ID"), (String) m.get("DESCRIPTION"));
+        	spList.add(sp);               
+        });
+        
+        mv.addObject("softwareParadigmList", spList);
+        
+        List<Map<String,Object>> list2 = jdbcTemplate.queryForList("SELECT [ID], [DESCRIPTION] FROM [SSKMS].[dbo].[SUBJECT_AREA]");        
+        List<SubjectArea> spList2 = new ArrayList<>();        
+        list2.forEach(m -> {               
+        	SubjectArea sa = new SubjectArea((int) m.get("ID"), (String) m.get("DESCRIPTION"));
+        	spList2.add(sa);
+        });
+        
+        mv.addObject("subjectAreaList", spList2);
 
-		List<String> paradigms = new ArrayList<>();
-		List<String> applications = new ArrayList<>();
-		List<String> subjects = new ArrayList<>();
-		List<String> languages = new ArrayList<>();
-		List<String> technologies = new ArrayList<>();
-
-		try (InputStream in = new FileInputStream(new File(KNOWLEDGE_REPOSITORY_PATH))) {
-			Model model = ModelFactory.createDefaultModel();
-			model.read(in, null, "TURTLE");
-
-			sparqlStatement = new StringBuilder();
-			sparqlStatement.append(getSparqlHeader());
-			sparqlStatement.append("SELECT ?x WHERE { ?x rdf:type :SoftwareParadigm }");
-
-			query = QueryFactory.create(sparqlStatement.toString());
-			qe = QueryExecutionFactory.create(query, model);
-			results = qe.execSelect();
-
-			while (results.hasNext()) {
-				paradigms.add(results.next().get("?x").asResource().getLocalName());
-			}
-
-			qe.close();
-
-			sparqlStatement = new StringBuilder();
-			sparqlStatement.append(getSparqlHeader());
-			sparqlStatement.append("SELECT ?x WHERE { ?x rdf:type :Application }");
-
-			query = QueryFactory.create(sparqlStatement.toString());
-
-			qe = QueryExecutionFactory.create(query, model);
-
-			results = qe.execSelect();
-
-			while (results.hasNext()) {
-				applications.add(results.next().get("?x").asResource().getLocalName());
-			}
-
-			qe.close();
-
-			sparqlStatement = new StringBuilder();
-			sparqlStatement.append(getSparqlHeader());
-			sparqlStatement.append("SELECT ?x WHERE { ?x rdf:type :SubjectArea }");
-
-			query = QueryFactory.create(sparqlStatement.toString());
-
-			qe = QueryExecutionFactory.create(query, model);
-
-			results = qe.execSelect();
-
-			while (results.hasNext()) {
-				subjects.add(results.next().get("?x").asResource().getLocalName());
-			}
-
-			qe.close();
-
-			sparqlStatement = new StringBuilder();
-			sparqlStatement.append(getSparqlHeader());
-			sparqlStatement.append("SELECT ?x WHERE { ?x rdf:type :Language }");
-
-			query = QueryFactory.create(sparqlStatement.toString());
-
-			qe = QueryExecutionFactory.create(query, model);
-
-			results = qe.execSelect();
-
-			while (results.hasNext()) {
-				languages.add(results.next().get("?x").asResource().getLocalName());
-			}
-
-			qe.close();
-
-			sparqlStatement = new StringBuilder();
-			sparqlStatement.append(getSparqlHeader());
-			sparqlStatement.append("SELECT ?x WHERE { ?x rdf:type :Technology }");
-
-			query = QueryFactory.create(sparqlStatement.toString());
-
-			qe = QueryExecutionFactory.create(query, model);
-
-			results = qe.execSelect();
-
-			while (results.hasNext()) {
-				technologies.add(results.next().get("?x").asResource().getLocalName());
-			}
-
-			qe.close();
-		} catch (FileNotFoundException e) {
-			e.printStackTrace();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-
-		mv.addObject("paradigms", constructHtmlDropDownList("paradigm", paradigms, true));
-		mv.addObject("applications", constructHtmlDropDownList("application", applications, false));
-		mv.addObject("subjects", constructHtmlDropDownList("subject", subjects, true));
-		mv.addObject("languages", constructHtmlDropDownList("language", languages, true));
-		mv.addObject("technologies", constructHtmlDropDownList("technology", technologies, true));
-
-		if (httpRequest.getMethod().contentEquals("POST")) {
+        if (httpRequest.getMethod().contentEquals("POST")) 
+		{
 			StringBuilder result = new StringBuilder();
 
-			try (InputStream in = new FileInputStream(new File(KNOWLEDGE_REPOSITORY_PATH))) {
-				Model model = ModelFactory.createDefaultModel();
-				model.read(in, null, "TURTLE");
-
-				sparqlStatement = new StringBuilder();
-				sparqlStatement.append(getSparqlHeader());
-				sparqlStatement.append("SELECT * ");
-				sparqlStatement.append("WHERE { ");
-
-				sparqlStatement.append("?SoftwareParadigm rdf:type :SoftwareParadigm .");
-				sparqlStatement.append("?Application rdf:type :Application .");
-				sparqlStatement.append("?SubjectArea rdf:type :SubjectArea .");
-
-				sparqlStatement.append("?SoftwareParadigm :hasSwFeature ?SoftwareFeature .");
-				sparqlStatement.append("?Application :hasSwFeature ?SoftwareFeature .");
-				sparqlStatement.append("?SubjectArea :hasSwFeature ?SoftwareFeature .");
-
-				sparqlStatement.append("?SoftwareFeature :hasSecReq ?SecurityRequirment .");
-				sparqlStatement.append("?SecurityRequirment :followedbyCP ?ConstructionPractice .");
-				sparqlStatement.append("?ConstructionPractice :relatedLanguage ?Language .");
-				sparqlStatement.append("?Language :provides ?Technology .");
-
-				sparqlStatement.append("?SecurityRequirment :associatedError ?SecurityError .");
-				sparqlStatement.append("?SecurityError :causes ?SoftwareWeakness .");
-
-				sparqlStatement.append("?ConstructionPractice :resource ?r .");
-				sparqlStatement.append("BIND (STR(?r) AS ?str_r) .");
-
-				sparqlStatement.append(
-						"FILTER regex(str(?SoftwareParadigm), str(\"^http://www.uowd.org/ontologies/2021/sscrum/softwaresecurity#")
-						.append(request.getParadigm()).append("$\"), 'i') .");
-				sparqlStatement.append(
-						"FILTER regex(str(?Application), str(\"^http://www.uowd.org/ontologies/2021/sscrum/softwaresecurity#")
-						.append(request.getApplication()).append("$\"), 'i') .");
-				sparqlStatement.append(
-						"FILTER regex(str(?SubjectArea), str(\"^http://www.uowd.org/ontologies/2021/sscrum/softwaresecurity#")
-						.append(request.getSubject()).append("$\"), 'i') .");
-				sparqlStatement.append(
-						"FILTER regex(str(?Language), str(\"^http://www.uowd.org/ontologies/2021/sscrum/softwaresecurity#")
-						.append(request.getLanguage()).append("$\"), 'i') .");
-				sparqlStatement.append(
-						"FILTER regex(str(?Technology), str(\"^http://www.uowd.org/ontologies/2021/sscrum/softwaresecurity#")
-						.append(request.getTechnology()).append("$\"), 'i')");
-
-				sparqlStatement.append("} ");
-				sparqlStatement.append("ORDER BY ASC(?SoftwareFeature) ASC(?SecurityRequirment) ");
-
-				query = QueryFactory.create(sparqlStatement.toString());
-				qe = QueryExecutionFactory.create(query, model);
-				results = qe.execSelect();
-
-				while (results.hasNext()) {
-					QuerySolution q = results.next();
-
-					result.append("<tr>");
-					result.append("<td>").append(q.get("?SoftwareFeature").asResource().getLocalName()).append("</td>");
-					result.append("<td>").append(q.get("?SecurityRequirment").asResource().getLocalName())
-							.append("</td>");
-					result.append("<td>").append(q.get("?SecurityError").asResource().getLocalName()).append("</td>");
-					result.append("<td>").append(q.get("?SoftwareWeakness").asResource().getLocalName())
-							.append("</td>");
-					result.append("<td>").append(q.get("?ConstructionPractice").asResource().getLocalName())
-							.append("</td>");
-					result.append("<td><a target=\"_blank\" href=\"").append(q.get("?str_r"))
-							.append("\">View</a></td>");
-					result.append("</tr>");
-				}
-
-				qe.close();
-			} catch (FileNotFoundException e) {
-				e.printStackTrace();
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
-
+			List<Map<String,Object>> list3 = jdbcTemplate.queryForList("SELECT SF.DESCRIPTION AS 'SOFTWARE FEATURE', SR.DESCRIPTION AS 'SECURITY REQUIREMENT', "
+					+ "SE.DESCRIPTION AS 'SECURITY ERROR', SW.DESCRIPTION AS 'VULNERABILITY', " 
+					+ "CP.DESCRIPTION AS 'CONSTRUCTION PRACTICE' " 
+					+ "FROM SOFTWARE_FEATURE AS SF "
+					+ "INNER JOIN SOFTWARE_PARADIGM_HAS_SOFTWARE_FEATURE SPHSF ON SPHSF.SOFTWARE_FEATURE_ID = SF.ID "
+					+ "INNER JOIN SUBJECT_AREA_HAS_SOFTWARE_FEATURE SAHSF ON SAHSF.SOFTWARE_FEATURE_ID = SF.ID "
+					+ "INNER JOIN SOFTWARE_FEATURE_HAS_SECURITY_REQUIREMENT SFHSR ON SFHSR.SOFTWARE_FEATURE_ID = SF.ID "
+					+ "INNER JOIN SECURITY_REQUIREMENT SR ON SR.ID = SFHSR.SECURITY_REQUIREMENT_ID "
+					+ "INNER JOIN SECURITY_REQUIREMENT_ASSOCIATED_SECURITY_ERROR SRASE ON SRASE.SECURITY_REQUIREMENT_ID = SFHSR.SECURITY_REQUIREMENT_ID "
+					+ "INNER JOIN SECURITY_ERROR SE ON SE.ID = SRASE.SECURITY_ERROR_ID "
+					+ "INNER JOIN SECURITY_ERROR_CAUSES_SOFTWARE_WEAKNESS SECSW ON SECSW.SECURITY_ERROR_ID = SE.ID "
+					+ "INNER JOIN SOFTWARE_WEAKNESS SW ON SW.ID = SECSW.SOFTWARE_WEAKNESS_ID "
+					+ "INNER JOIN SOFTWARE_FEATURE_HAS_CONSTRUCTION_PRACTICE SFHCP ON SFHCP.SOFTWARE_FEATURE_ID = SF.ID "
+					+ "INNER JOIN SECURITY_REQUIREMENT_FOLLOWED_BY_CONSTRUCTION_PRACTICE SRFBCP ON SRFBCP.SECURITY_REQUIREMENT_ID = SR.ID "
+					+ "INNER JOIN SECURITY_ERROR_MITIGATED_BY_CONSTRUCTION_PRACTICE SEMBCP ON SEMBCP.SECURITY_ERROR_ID = SE.ID "
+					+ "INNER JOIN CONSTRUCTION_PRACTICE CP ON CP.ID = SFHCP.CONSTRUCTION_PRACTICE_ID AND CP.ID = SRFBCP.CONSTRUCTION_PRACTICE_ID AND CP.ID = SEMBCP.CONSTRUCTION_PRACTICE_ID "
+					+ "WHERE SPHSF.SOFTWARE_PARADIGM_ID = ? AND SAHSF.SUBJECT_AREA_ID = ?", implementationRequest.getSoftwareParadigmId(), implementationRequest.getSubjectAreaId());
+			
+			list3.forEach(m -> {
+				result.append("<tr>");
+				result.append("<td>").append(m.get("SOFTWARE FEATURE")).append("</td>");
+				result.append("<td>").append(m.get("SECURITY REQUIREMENT")).append("</td>");
+				result.append("<td>").append(m.get("SECURITY ERROR")).append("</td>");
+				result.append("<td>").append(m.get("VULNERABILITY")).append("</td>");
+				result.append("<td>").append(m.get("CONSTRUCTION PRACTICE")).append("</td>");
+				result.append("<td><a target=\"_blank\" href=\"").append("https://www.google.com").append("\">View</a></td>");
+				result.append("</tr>");
+	        });
+		
 			mv.addObject("result", result.toString());
 		}
 
@@ -404,185 +176,58 @@ public class MainController {
 
 	@RequestMapping(value = "/s-scrum-utilities/security-verification", method = { RequestMethod.GET, RequestMethod.POST })
 	public ModelAndView securityVerificationView(HttpServletRequest httpRequest,
-			@ModelAttribute("request") VerificationRequest request) {
+			@ModelAttribute("verificationRequest") VerificationRequest verificationRequest) {
+		
 		ModelAndView mv = new ModelAndView("security-verification");
 
-		StringBuilder sparqlStatement;
-		Query query;
-		QueryExecution qe;
-		ResultSet results;
-
-		List<String> paradigms = new ArrayList<>();
-		List<String> applications = new ArrayList<>();
-		List<String> subjects = new ArrayList<>();
-		List<String> languages = new ArrayList<>();
-		List<String> technologies = new ArrayList<>();
-
-		try (InputStream in = new FileInputStream(new File(KNOWLEDGE_REPOSITORY_PATH))) {
-			Model model = ModelFactory.createDefaultModel();
-			model.read(in, null, "TURTLE");
-
-			sparqlStatement = new StringBuilder();
-			sparqlStatement.append(getSparqlHeader());
-			sparqlStatement.append("SELECT ?x WHERE { ?x rdf:type :SoftwareParadigm }");
-
-			query = QueryFactory.create(sparqlStatement.toString());
-			qe = QueryExecutionFactory.create(query, model);
-			results = qe.execSelect();
-
-			while (results.hasNext()) {
-				paradigms.add(results.next().get("?x").asResource().getLocalName());
-			}
-
-			qe.close();
-
-			sparqlStatement = new StringBuilder();
-			sparqlStatement.append(getSparqlHeader());
-			sparqlStatement.append("SELECT ?x WHERE { ?x rdf:type :Application }");
-
-			query = QueryFactory.create(sparqlStatement.toString());
-
-			qe = QueryExecutionFactory.create(query, model);
-
-			results = qe.execSelect();
-
-			while (results.hasNext()) {
-				applications.add(results.next().get("?x").asResource().getLocalName());
-			}
-
-			qe.close();
-
-			sparqlStatement = new StringBuilder();
-			sparqlStatement.append(getSparqlHeader());
-			sparqlStatement.append("SELECT ?x WHERE { ?x rdf:type :SubjectArea }");
-
-			query = QueryFactory.create(sparqlStatement.toString());
-
-			qe = QueryExecutionFactory.create(query, model);
-
-			results = qe.execSelect();
-
-			while (results.hasNext()) {
-				subjects.add(results.next().get("?x").asResource().getLocalName());
-			}
-
-			qe.close();
-
-			sparqlStatement = new StringBuilder();
-			sparqlStatement.append(getSparqlHeader());
-			sparqlStatement.append("SELECT ?x WHERE { ?x rdf:type :Language }");
-
-			query = QueryFactory.create(sparqlStatement.toString());
-
-			qe = QueryExecutionFactory.create(query, model);
-
-			results = qe.execSelect();
-
-			while (results.hasNext()) {
-				languages.add(results.next().get("?x").asResource().getLocalName());
-			}
-
-			qe.close();
-
-			sparqlStatement = new StringBuilder();
-			sparqlStatement.append(getSparqlHeader());
-			sparqlStatement.append("SELECT ?x WHERE { ?x rdf:type :Technology }");
-
-			query = QueryFactory.create(sparqlStatement.toString());
-
-			qe = QueryExecutionFactory.create(query, model);
-
-			results = qe.execSelect();
-
-			while (results.hasNext()) {
-				technologies.add(results.next().get("?x").asResource().getLocalName());
-			}
-
-			qe.close();
-		} catch (FileNotFoundException e) {
-			e.printStackTrace();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-
-		mv.addObject("paradigms", constructHtmlDropDownList("paradigm", paradigms, true));
-		mv.addObject("applications", constructHtmlDropDownList("application", applications, false));
-		mv.addObject("subjects", constructHtmlDropDownList("subject", subjects, true));
-		mv.addObject("languages", constructHtmlDropDownList("language", languages, true));
-		mv.addObject("technologies", constructHtmlDropDownList("technology", technologies, true));
+		List<Map<String,Object>> list = jdbcTemplate.queryForList("SELECT [ID], [DESCRIPTION] FROM [SSKMS].[dbo].[SOFTWARE_PARADIGM]");        
+        List<SoftwareParadigm> spList = new ArrayList<>();        
+        list.forEach(m -> {               
+        	SoftwareParadigm sp = new SoftwareParadigm((int) m.get("ID"), (String) m.get("DESCRIPTION"));
+        	spList.add(sp);               
+        });
+        
+        mv.addObject("softwareParadigmList", spList);
+        
+        List<Map<String,Object>> list2 = jdbcTemplate.queryForList("SELECT [ID], [DESCRIPTION] FROM [SSKMS].[dbo].[SUBJECT_AREA]");        
+        List<SubjectArea> spList2 = new ArrayList<>();        
+        list2.forEach(m -> {               
+        	SubjectArea sa = new SubjectArea((int) m.get("ID"), (String) m.get("DESCRIPTION"));
+        	spList2.add(sa);
+        });
+        
+        mv.addObject("subjectAreaList", spList2);
 
 		if (httpRequest.getMethod().contentEquals("POST")) {
 			StringBuilder result = new StringBuilder();
 
-			try (InputStream in = new FileInputStream(new File(KNOWLEDGE_REPOSITORY_PATH))) {
-				Model model = ModelFactory.createDefaultModel();
-				model.read(in, null, "TURTLE");
-
-				sparqlStatement = new StringBuilder();
-				sparqlStatement.append(getSparqlHeader());
-				sparqlStatement.append("SELECT * ");
-				sparqlStatement.append("WHERE { ");
-
-				sparqlStatement.append("?SoftwareParadigm rdf:type :SoftwareParadigm .");
-				sparqlStatement.append("?Application rdf:type :Application .");
-				sparqlStatement.append("?SubjectArea rdf:type :SubjectArea .");
-
-				sparqlStatement.append("?SoftwareParadigm :hasSwFeature ?SoftwareFeature .");
-				sparqlStatement.append("?Application :hasSwFeature ?SoftwareFeature .");
-				sparqlStatement.append("?SubjectArea :hasSwFeature ?SoftwareFeature .");
-
-				sparqlStatement.append("?SoftwareFeature :hasSecReq ?SecurityRequirment .");
-				sparqlStatement.append("?SecurityRequirment :followedbyVP ?VerificationPractice .");
-				sparqlStatement.append("?SecurityRequirment :associatedError ?SecurityError .");
-				sparqlStatement.append("?SecurityError :causes ?SoftwareWeakness .");
-
-				sparqlStatement.append("?SecurityError :relatedLanguage ?Language .");
-				sparqlStatement.append("?Language :provides ?Technology .");
-
-				sparqlStatement.append(
-						"FILTER regex(str(?SoftwareParadigm), str(\"^http://www.uowd.org/ontologies/2021/sscrum/softwaresecurity#")
-						.append(request.getParadigm()).append("$\"), 'i') .");
-				sparqlStatement.append(
-						"FILTER regex(str(?Application), str(\"^http://www.uowd.org/ontologies/2021/sscrum/softwaresecurity#")
-						.append(request.getApplication()).append("$\"), 'i') .");
-				sparqlStatement.append(
-						"FILTER regex(str(?SubjectArea), str(\"^http://www.uowd.org/ontologies/2021/sscrum/softwaresecurity#")
-						.append(request.getSubject()).append("$\"), 'i') .");
-				sparqlStatement.append(
-						"FILTER regex(str(?Language), str(\"^http://www.uowd.org/ontologies/2021/sscrum/softwaresecurity#")
-						.append(request.getLanguage()).append("$\"), 'i') .");
-				sparqlStatement.append(
-						"FILTER regex(str(?Technology), str(\"^http://www.uowd.org/ontologies/2021/sscrum/softwaresecurity#")
-						.append(request.getTechnology()).append("$\"), 'i')");
-
-				sparqlStatement.append("} ");
-				sparqlStatement.append("ORDER BY ASC(?SoftwareFeature) ASC(?SecurityRequirment) ");
-
-				query = QueryFactory.create(sparqlStatement.toString());
-				qe = QueryExecutionFactory.create(query, model);
-				results = qe.execSelect();
-
-				while (results.hasNext()) {
-					QuerySolution q = results.next();
-
-					result.append("<tr>");
-					result.append("<td>").append(q.get("?SoftwareFeature").asResource().getLocalName()).append("</td>");
-					result.append("<td>").append(q.get("?SecurityRequirment").asResource().getLocalName())
-							.append("</td>");
-					result.append("<td>").append(q.get("?SecurityError").asResource().getLocalName()).append("</td>");
-					result.append("<td>").append(q.get("?SoftwareWeakness").asResource().getLocalName())
-							.append("</td>");
-					result.append("<td>").append(q.get("?VerificationPractice").asResource().getLocalName())
-							.append("</td>");
-					result.append("</tr>");
-				}
-
-				qe.close();
-			} catch (FileNotFoundException e) {
-				e.printStackTrace();
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
+			List<Map<String,Object>> list3 = jdbcTemplate.queryForList("SELECT SF.DESCRIPTION AS 'SOFTWARE FEATURE', SR.DESCRIPTION AS 'SECURITY REQUIREMENT', "
+					+ "SE.DESCRIPTION AS 'SECURITY ERROR', SW.DESCRIPTION AS 'VULNERABILITY', " 
+					+ "VP.DESCRIPTION AS 'VERIFICATION PRACTICE' " 
+					+ "FROM SOFTWARE_FEATURE AS SF "
+					+ "INNER JOIN SOFTWARE_PARADIGM_HAS_SOFTWARE_FEATURE SPHSF ON SPHSF.SOFTWARE_FEATURE_ID = SF.ID "
+					+ "INNER JOIN SUBJECT_AREA_HAS_SOFTWARE_FEATURE SAHSF ON SAHSF.SOFTWARE_FEATURE_ID = SF.ID "
+					+ "INNER JOIN SOFTWARE_FEATURE_HAS_SECURITY_REQUIREMENT SFHSR ON SFHSR.SOFTWARE_FEATURE_ID = SF.ID "
+					+ "INNER JOIN SECURITY_REQUIREMENT SR ON SR.ID = SFHSR.SECURITY_REQUIREMENT_ID "
+					+ "INNER JOIN SECURITY_REQUIREMENT_ASSOCIATED_SECURITY_ERROR SRASE ON SRASE.SECURITY_REQUIREMENT_ID = SFHSR.SECURITY_REQUIREMENT_ID "
+					+ "INNER JOIN SECURITY_ERROR SE ON SE.ID = SRASE.SECURITY_ERROR_ID "
+					+ "INNER JOIN SECURITY_ERROR_CAUSES_SOFTWARE_WEAKNESS SECSW ON SECSW.SECURITY_ERROR_ID = SE.ID "
+					+ "INNER JOIN SOFTWARE_WEAKNESS SW ON SW.ID = SECSW.SOFTWARE_WEAKNESS_ID "
+					+ "INNER JOIN SECURITY_REQUIREMENT_FOLLOWED_BY_VERIFICATION_PRACTICE SRFBVP ON SRFBVP.SECURITY_REQUIREMENT_ID = SR.ID "
+					+ "INNER JOIN SECURITY_ERROR_SPOTTED_BY_VERIFICATION_PRACTICE SESBVP ON SESBVP.SECURITY_ERROR_ID = SE.ID "
+					+ "INNER JOIN VERIFICATION_PRACTICE VP ON VP.ID = SRFBVP.VERIFICATION_PRACTICE_ID AND VP.ID = SESBVP.VERIFICATION_PRACTICE_ID "
+					+ "WHERE SPHSF.SOFTWARE_PARADIGM_ID = ? AND SAHSF.SUBJECT_AREA_ID = ?", verificationRequest.getSoftwareParadigmId(), verificationRequest.getSubjectAreaId());
+			
+			list3.forEach(m -> {
+				result.append("<tr>");
+				result.append("<td>").append(m.get("SOFTWARE FEATURE")).append("</td>");
+				result.append("<td>").append(m.get("SECURITY REQUIREMENT")).append("</td>");
+				result.append("<td>").append(m.get("SECURITY ERROR")).append("</td>");
+				result.append("<td>").append(m.get("VULNERABILITY")).append("</td>");
+				result.append("<td>").append(m.get("VERIFICATION PRACTICE")).append("</td>");
+				result.append("<td><a target=\"_blank\" href=\"").append("https://www.google.com").append("\">View</a></td>");
+				result.append("</tr>");
+	        });
 
 			mv.addObject("result", result.toString());
 		}
@@ -2320,17 +1965,6 @@ public class MainController {
         });
         
 	    return seList;
-	}
-
-	private static String getSparqlHeader() {
-		StringBuilder sparqlHeader = new StringBuilder();
-		sparqlHeader.append("PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> ");
-		sparqlHeader.append("PREFIX owl: <http://www.w3.org/2002/07/owl#> ");
-		sparqlHeader.append("PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> ");
-		sparqlHeader.append("PREFIX xsd: <http://www.w3.org/2001/XMLSchema#> ");
-		sparqlHeader.append("PREFIX : <http://www.uowd.org/ontologies/2021/sscrum/softwaresecurity#> ");
-
-		return sparqlHeader.toString();
 	}
 
 	private String constructHtmlDropDownList(String name, List<String> list, boolean isVisible) {

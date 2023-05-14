@@ -1,37 +1,41 @@
 package org.uowd.sskrs.models;
 
 public class IdentificationRequest {
-	private String paradigm;
-	private String application;
-	private String subject;
+	private String softwareParadigmId;
+	private String subjectAreaId;
 
-	public String getParadigm() {
-		return paradigm;
+	public IdentificationRequest() {
+		super();
+		
+		this.softwareParadigmId = "-1";
+		this.subjectAreaId = "-1";
 	}
 
-	public void setParadigm(String paradigm) {
-		this.paradigm = paradigm;
+	public IdentificationRequest(String softwareParadigmId, String subjectAreaId) {
+		super();
+		this.softwareParadigmId = softwareParadigmId;
+		this.subjectAreaId = subjectAreaId;
 	}
 
-	public String getApplication() {
-		return application;
+	public String getSoftwareParadigmId() {
+		return softwareParadigmId;
 	}
 
-	public void setApplication(String application) {
-		this.application = application;
+	public void setSoftwareParadigmId(String softwareParadigmId) {
+		this.softwareParadigmId = softwareParadigmId;
 	}
 
-	public String getSubject() {
-		return subject;
+	public String getSubjectAreaId() {
+		return subjectAreaId;
 	}
 
-	public void setSubject(String subject) {
-		this.subject = subject;
+	public void setSubjectAreaId(String subjectAreaId) {
+		this.subjectAreaId = subjectAreaId;
 	}
 
 	@Override
 	public String toString() {
-		return "IdentificationRequest [paradigm=" + paradigm + ", application=" + application + ", subject=" + subject
+		return "IdentificationRequest [softwareParadigmId=" + softwareParadigmId + ", subjectAreaId=" + subjectAreaId
 				+ "]";
 	}
 

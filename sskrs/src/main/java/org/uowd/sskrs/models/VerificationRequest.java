@@ -1,55 +1,41 @@
 package org.uowd.sskrs.models;
 
 public class VerificationRequest {
-	private String paradigm;
-	private String application;
-	private String subject;
-	private String language;
-	private String technology;
-
-	public String getParadigm() {
-		return paradigm;
+	private String softwareParadigmId;
+	private String subjectAreaId;
+	
+	public VerificationRequest() {
+		super();
+		
+		this.softwareParadigmId = "-1";
+		this.subjectAreaId = "-1";
 	}
 
-	public void setParadigm(String paradigm) {
-		this.paradigm = paradigm;
+	public VerificationRequest(String softwareParadigmId, String subjectAreaId) {
+		super();
+		this.softwareParadigmId = softwareParadigmId;
+		this.subjectAreaId = subjectAreaId;
 	}
 
-	public String getApplication() {
-		return application;
+	public String getSoftwareParadigmId() {
+		return softwareParadigmId;
 	}
 
-	public void setApplication(String application) {
-		this.application = application;
+	public void setSoftwareParadigmId(String softwareParadigmId) {
+		this.softwareParadigmId = softwareParadigmId;
 	}
 
-	public String getSubject() {
-		return subject;
+	public String getSubjectAreaId() {
+		return subjectAreaId;
 	}
 
-	public void setSubject(String subject) {
-		this.subject = subject;
-	}
-
-	public String getLanguage() {
-		return language;
-	}
-
-	public void setLanguage(String language) {
-		this.language = language;
-	}
-
-	public String getTechnology() {
-		return technology;
-	}
-
-	public void setTechnology(String technology) {
-		this.technology = technology;
+	public void setSubjectAreaId(String subjectAreaId) {
+		this.subjectAreaId = subjectAreaId;
 	}
 
 	@Override
 	public String toString() {
-		return "VerificationRequest [paradigm=" + paradigm + ", application=" + application + ", subject=" + subject
-				+ ", language=" + language + ", technology=" + technology + "]";
+		return "VerificationRequest [softwareParadigmId=" + softwareParadigmId + ", subjectAreaId=" + subjectAreaId
+				+ "]";
 	}
 }

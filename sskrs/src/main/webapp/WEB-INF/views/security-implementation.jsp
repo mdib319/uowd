@@ -2,6 +2,8 @@
 <%@ page language="java" contentType="text/html; charset=UTF-8"
 	pageEncoding="UTF-8"%>
 <%@ page isELIgnored="false"%>
+<%@ taglib prefix="form" uri="http://www.springframework.org/tags/form"%>
+<%@ page import="java.util.List"%>
 <html>
 <head>
 <meta charset="UTF-8">
@@ -13,7 +15,7 @@
 	<a href="/sskrs/s-scrum-utilities"><img align="middle" src="/sskrs/resources/images/uowd-logo.png" /></a> 
 	<h1>Security Implementation Utility</h1>	
 	
-	<form action="/sskrs/s-scrum-utilities/security-implementation" method="post">
+	<form:form action="/sskrs/s-scrum-utilities/security-implementation" method="post" modelAttribute="implementationRequest">
 		<table>
 			<thead>
 				<tr>
@@ -22,31 +24,29 @@
 			</thead>
 			<tbody>
 				<tr>
-					<td><label>Paradigm</label></td>
-					<td><%=request.getAttribute("paradigms")%></td>
+					<td><form:label path="softwareParadigmId">Software Paradigm</form:label></td>
+					<td>
+						<form:select path="softwareParadigmId" name="softwareParadigmId">
+							<form:option value="" selected="true">Please Select..</form:option>
+							<form:options items="${softwareParadigmList}" itemValue="id" itemLabel="description" />
+						</form:select>
+					</td>
 				</tr>
 				<tr>
-					<td>Subject Area</td>
-					<td><%=request.getAttribute("subjects")%></td>
-				</tr>
-				<tr>
-					<td>Language</td>
-					<td><%=request.getAttribute("languages")%></td>
-				</tr>
-				<tr>
-					<td>Technology</td>
-					<td><%=request.getAttribute("technologies")%></td>
-				</tr>
-				<tr>
-					<td>&nbsp;</td>
-					<td><%=request.getAttribute("applications")%></td>
+					<td><form:label path="subjectAreaId">Subject Area</form:label></td>
+					<td>
+						<form:select path="subjectAreaId" name="subjectAreaId">
+							<form:option value="" selected="true">Please Select..</form:option>
+							<form:options items="${subjectAreaList}" itemValue="id" itemLabel="description" />
+						</form:select>
+					</td>
 				</tr>
 				<tr>
 					<td colspan="2" align="right"><input id="submit" name="submit" type="submit" alt="Search" value="Search" /></td>
 				</tr>
 			</tbody>
 		</table>		
-	</form>
+	</form:form>
 
 	<c:if test="${not empty result}">
 		<input id="myInput" type="text" placeholder="Search..">
@@ -62,7 +62,7 @@
 					<th>Security Error</th>
 					<th>Vulnerability</th>
 					<th>Construction Practice</th>
-					<th>Resource</th>
+					<th></th>
 				</tr>
 			</thead>
 			<tbody id="myTable">
