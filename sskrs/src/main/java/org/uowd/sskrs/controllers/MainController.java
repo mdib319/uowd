@@ -22,6 +22,7 @@ import org.apache.jena.rdf.model.Model;
 import org.apache.jena.rdf.model.ModelFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -45,6 +46,8 @@ import org.uowd.sskrs.models.SoftwareParadigm;
 import org.uowd.sskrs.models.SoftwareWeakness;
 import org.uowd.sskrs.models.SoftwareWeaknessManager;
 import org.uowd.sskrs.models.SubjectArea;
+import org.uowd.sskrs.models.VerificationPractice;
+import org.uowd.sskrs.models.VerificationPracticeManager;
 import org.uowd.sskrs.models.VerificationRequest;
 
 @Controller
@@ -1593,9 +1596,7 @@ public class MainController {
     			constructionPracticeManager.setSecurityRequirementId("");
 			}
 			else
-			{
-				boolean error = false;
-				
+			{				
 				if(constructionPracticeManager.getSelectConstructionPractice().contentEquals("E"))
 				{
 					if(constructionPracticeManager.getConstructionPracticeId().contentEquals("-1") || constructionPracticeManager.getConstructionPracticeId().trim().isEmpty())
@@ -1605,9 +1606,57 @@ public class MainController {
 					}
 					else
 					{
-						//SOFTWARE_FEATURE_HAS_CONSTRUCTION_PRACTICE
-						//SECURITY_REQUIREMENT_FOLLOWED_BY_CONSTRUCTION_PRACTICE
-						//SECURITY_ERROR_MITIGATED_BY_CONSTRUCTION_PRACTICE
+						int rows;
+						int count;
+						
+						boolean error = false;
+						
+						count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM [dbo].[SOFTWARE_FEATURE_HAS_CONSTRUCTION_PRACTICE] WHERE [SOFTWARE_FEATURE_ID] = ? AND [CONSTRUCTION_PRACTICE_ID] = ?", Integer.class, constructionPracticeManager.getSoftwareFeatureId(), constructionPracticeManager.getConstructionPracticeId());
+						
+						if(count == 0)
+						{
+							rows = jdbcTemplate.update("INSERT INTO [dbo].[SOFTWARE_FEATURE_HAS_CONSTRUCTION_PRACTICE] ([SOFTWARE_FEATURE_ID], [CONSTRUCTION_PRACTICE_ID]) VALUES (?, ?)", constructionPracticeManager.getSoftwareFeatureId(), constructionPracticeManager.getConstructionPracticeId());
+							
+							if(rows != 1)
+							{
+								error = true;
+							}
+						}
+						
+						count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM [dbo].[SECURITY_REQUIREMENT_FOLLOWED_BY_CONSTRUCTION_PRACTICE] WHERE [SECURITY_REQUIREMENT_ID] = ? AND [CONSTRUCTION_PRACTICE_ID] = ?", Integer.class, constructionPracticeManager.getSecurityRequirementId(), constructionPracticeManager.getConstructionPracticeId());
+						
+						if(count == 0)
+						{
+							rows = jdbcTemplate.update("INSERT INTO [dbo].[SECURITY_REQUIREMENT_FOLLOWED_BY_CONSTRUCTION_PRACTICE] ([SECURITY_REQUIREMENT_ID], [CONSTRUCTION_PRACTICE_ID]) VALUES (?, ?)", constructionPracticeManager.getSecurityRequirementId(), constructionPracticeManager.getConstructionPracticeId());
+							
+							if(rows != 1)
+							{
+								error = true;
+							}
+						}
+						
+						count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM [dbo].[SECURITY_ERROR_MITIGATED_BY_CONSTRUCTION_PRACTICE] WHERE [SECURITY_ERROR_ID] = ? AND [CONSTRUCTION_PRACTICE_ID] = ?", Integer.class, constructionPracticeManager.getSecurityErrorId(), constructionPracticeManager.getConstructionPracticeId());
+
+						if(count == 0)
+						{
+							rows = jdbcTemplate.update("INSERT INTO [dbo].[SECURITY_ERROR_MITIGATED_BY_CONSTRUCTION_PRACTICE] ([SECURITY_ERROR_ID], [CONSTRUCTION_PRACTICE_ID]) VALUES (?, ?)", constructionPracticeManager.getSecurityErrorId(), constructionPracticeManager.getConstructionPracticeId());
+							
+							if(rows != 1)
+							{
+								error = true;
+							}
+						}
+						
+						if(!error)
+						{
+							mnv.addObject(STATUS, "1");
+			    			mnv.addObject(MESSAGE, "Construction Practice inserted successfully.");
+						}
+						else
+						{
+							mnv.addObject(STATUS, "0");
+			    			mnv.addObject(MESSAGE, "An error occurred while inserting the Construction Practice.");
+						}
 					}
 				}
 				else if(constructionPracticeManager.getSelectConstructionPractice().contentEquals("N"))
@@ -1649,97 +1698,117 @@ public class MainController {
 					}
 					else
 					{
+						boolean error = false;
+						
 						int rows;
+						int count;
 						
-						String cpInsert = "DECLARE @INSERTED_TABLE TABLE (ID INT);"
-										+ "DECLARE @CONSTRUCTION_PRACTICE_ID INT;"
-										+ "INSERT INTO [dbo].[CONSTRUCTION_PRACTICE] ([DESCRIPTION]) OUTPUT INSERTED.ID INTO @INSERTED_TABLE VALUES (?);"
-										+ "SELECT @CONSTRUCTION_PRACTICE_ID = ID FROM @INSERTED_TABLE;"
-										+ "SELECT @CONSTRUCTION_PRACTICE_ID AS 'CONSTRUCTION PRACTICE ID';";
+						int cpId;
 						
-						int cpId = jdbcTemplate.queryForObject(cpInsert, (rs, rowNum) -> rs.getInt("CONSTRUCTION PRACTICE ID"), constructionPracticeManager.getConstructionPracticeDescription());
+						String commonInsertStat = "DECLARE @INSERTED_TABLE TABLE (ID INT);";
+						
+						try
+						{
+							cpId = jdbcTemplate.queryForObject("SELECT ID FROM [dbo].[CONSTRUCTION_PRACTICE] WHERE [DESCRIPTION] LIKE CAST(? AS VARCHAR(MAX))", Integer.class, constructionPracticeManager.getConstructionPracticeDescription());
+						}
+						catch(EmptyResultDataAccessException ex)
+						{
+							String cpInsert = commonInsertStat
+									+ "DECLARE @CONSTRUCTION_PRACTICE_ID INT;"
+									+ "INSERT INTO [dbo].[CONSTRUCTION_PRACTICE] ([DESCRIPTION]) OUTPUT INSERTED.ID INTO @INSERTED_TABLE VALUES (?);"
+									+ "SELECT @CONSTRUCTION_PRACTICE_ID = ID FROM @INSERTED_TABLE;"
+									+ "SELECT @CONSTRUCTION_PRACTICE_ID AS 'CONSTRUCTION PRACTICE ID';";
+					
+							cpId = jdbcTemplate.queryForObject(cpInsert, (rs, rowNum) -> rs.getInt("CONSTRUCTION PRACTICE ID"), constructionPracticeManager.getConstructionPracticeDescription());
+						}
 						
 						if(constructionPracticeManager.getFollowStrategy() != null)
 						{
-							String fsInsert = "DECLARE @INSERTED_TABLE TABLE (ID INT);"
-									+ "DECLARE @STRATEGY_ID INT;"
-									+ "INSERT INTO [dbo].[STRATEGY] ([DESCRIPTION]) OUTPUT INSERTED.ID INTO @INSERTED_TABLE VALUES (?);"
-									+ "SELECT @STRATEGY_ID = ID FROM @INSERTED_TABLE;"
-									+ "SELECT @STRATEGY_ID AS 'STRATEGY ID';";
+							int fsId;
 							
-							int fsId = jdbcTemplate.queryForObject(fsInsert, (rs, rowNum) -> rs.getInt("STRATEGY ID"), constructionPracticeManager.getStrategyDescription());
-							
-							rows = jdbcTemplate.update("INSERT INTO [dbo].[CONSTRUCTION_PRACTICE_FOLLOWS_STRATEGY] ([CONSTRUCTION_PRACTICE_ID], [STRATEGY_ID]) VALUES (?, ?)", cpId, fsId);
-							
-							if(rows != 1)
+							try
 							{
-								error = true;
+								fsId = jdbcTemplate.queryForObject("SELECT ID FROM [dbo].[STRATEGY] WHERE [DESCRIPTION] LIKE CAST(? AS VARCHAR(MAX))", Integer.class, constructionPracticeManager.getStrategyDescription());
+							}
+							catch(EmptyResultDataAccessException ex)
+							{
+								String fsInsert = commonInsertStat
+										+ "DECLARE @STRATEGY_ID INT;"
+										+ "INSERT INTO [dbo].[STRATEGY] ([DESCRIPTION]) OUTPUT INSERTED.ID INTO @INSERTED_TABLE VALUES (?);"
+										+ "SELECT @STRATEGY_ID = ID FROM @INSERTED_TABLE;"
+										+ "SELECT @STRATEGY_ID AS 'STRATEGY ID';";
+								
+								fsId = jdbcTemplate.queryForObject(fsInsert, (rs, rowNum) -> rs.getInt("STRATEGY ID"), constructionPracticeManager.getStrategyDescription());
+							}
+							
+							count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM [dbo].[CONSTRUCTION_PRACTICE_FOLLOWS_STRATEGY] WHERE [CONSTRUCTION_PRACTICE_ID] = ? AND [STRATEGY_ID] = ?", Integer.class, cpId, fsId);
+
+							if(count == 0)
+							{
+								rows = jdbcTemplate.update("INSERT INTO [dbo].[CONSTRUCTION_PRACTICE_FOLLOWS_STRATEGY] ([CONSTRUCTION_PRACTICE_ID], [STRATEGY_ID]) VALUES (?, ?)", cpId, fsId);
+								
+								if(rows != 1)
+								{
+									error = true;
+								}
 							}
 						}
 						
 						if(constructionPracticeManager.getHasMethod() != null)
 						{
-							String mInsert = "DECLARE @INSERTED_TABLE TABLE (ID INT);"
-									+ "DECLARE @METHOD_ID INT;"
-									+ "INSERT INTO [dbo].[METHOD] ([DESCRIPTION]) OUTPUT INSERTED.ID INTO @INSERTED_TABLE VALUES (?);"
-									+ "SELECT @METHOD_ID = ID FROM @INSERTED_TABLE;" 
-									+ "SELECT @METHOD_ID AS 'METHOD ID';";
+							int mId;
 							
-							int mId = jdbcTemplate.queryForObject(mInsert, (rs, rowNum) -> rs.getInt("METHOD ID"), constructionPracticeManager.getMethodDetails());
-							
-							rows = jdbcTemplate.update("INSERT INTO [dbo].[CONSTRUCTION_PRACTICE_HAS_METHOD] ([CONSTRUCTION_PRACTICE_ID], [METHOD_ID]) VALUES (?, ?)", cpId, mId);
-							
-							if(rows != 1)
+							try
 							{
-								error = true;
+								mId = jdbcTemplate.queryForObject("SELECT ID FROM [dbo].[METHOD] WHERE DESCRIPTION LIKE CAST(? AS VARCHAR(MAX))", Integer.class, constructionPracticeManager.getMethodDetails());
+							}
+							catch(EmptyResultDataAccessException ex)
+							{
+								String mInsert = commonInsertStat
+										+ "DECLARE @METHOD_ID INT;"
+										+ "INSERT INTO [dbo].[METHOD] ([DESCRIPTION]) OUTPUT INSERTED.ID INTO @INSERTED_TABLE VALUES (?);"
+										+ "SELECT @METHOD_ID = ID FROM @INSERTED_TABLE;" 
+										+ "SELECT @METHOD_ID AS 'METHOD ID';";
+								
+								mId = jdbcTemplate.queryForObject(mInsert, (rs, rowNum) -> rs.getInt("METHOD ID"), constructionPracticeManager.getMethodDetails());
+							}
+							
+							count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM [dbo].[CONSTRUCTION_PRACTICE_HAS_METHOD] WHERE [CONSTRUCTION_PRACTICE_ID] = ? AND [METHOD_ID] = ?", Integer.class, cpId, mId);
+
+							if(count == 0)
+							{
+								rows = jdbcTemplate.update("INSERT INTO [dbo].[CONSTRUCTION_PRACTICE_HAS_METHOD] ([CONSTRUCTION_PRACTICE_ID], [METHOD_ID]) VALUES (?, ?)", cpId, mId);
+								
+								if(rows != 1)
+								{
+									error = true;
+								}
 							}
 							
 							if(constructionPracticeManager.getRelatedLanguage() != null)
 							{
-								String lInsert = "DECLARE @INSERTED_TABLE TABLE (ID INT);"
-										+ "DECLARE @LANGUAGE_ID INT;"
-										+ "INSERT INTO [dbo].[LANGUAGE] ([DESCRIPTION]) OUTPUT INSERTED.ID INTO @INSERTED_TABLE VALUES (?);"
-										+ "SELECT @LANGUAGE_ID = ID FROM @INSERTED_TABLE;"
-										+ "SELECT @LANGUAGE_ID AS 'LANGUAGE ID';";
+								int lId;
 								
-								int lId = jdbcTemplate.queryForObject(lInsert, (rs, rowNum) -> rs.getInt("LANGUAGE ID"), constructionPracticeManager.getLanguage());
-								
-								rows = jdbcTemplate.update("INSERT INTO [dbo].[METHOD_RELATED_LANGUAGE] ([METHOD_ID], [LANGUAGE_ID]) VALUES (?, ?)", mId, lId);
-								
-								if(rows != 1)
+								try
 								{
-									error = true;
+									lId = jdbcTemplate.queryForObject("SELECT ID FROM [dbo].[LANGUAGE] WHERE [DESCRIPTION] LIKE CAST(? AS VARCHAR(MAX))", Integer.class, constructionPracticeManager.getLanguage());
 								}
-							}
-							
-							if(constructionPracticeManager.getHasMechanism() != null)
-							{
-								String mechInsert = "DECLARE @INSERTED_TABLE TABLE (ID INT);"
-										+ "DECLARE @MECHANISM_ID INT;"
-										+ "INSERT INTO [dbo].[MECHANISM] ([DESCRIPTION]) OUTPUT INSERTED.ID INTO @INSERTED_TABLE VALUES (?);"
-										+ "SELECT @MECHANISM_ID = ID FROM @INSERTED_TABLE;"
-										+ "SELECT @MECHANISM_ID AS 'MECHANISM ID';";
-								
-								int mechId = jdbcTemplate.queryForObject(mechInsert, (rs, rowNum) -> rs.getInt("MECHANISM ID"), constructionPracticeManager.getMechanism());
-								
-								rows = jdbcTemplate.update("INSERT INTO [dbo].[METHOD_HAS_MECHANISM] ([METHOD_ID], [MECHANISM_ID]) VALUES (?, ?)", mId, mechId);
-								
-								if(rows != 1)
+								catch(EmptyResultDataAccessException ex)
 								{
-									error = true;
+									String lInsert = commonInsertStat
+											+ "DECLARE @LANGUAGE_ID INT;"
+											+ "INSERT INTO [dbo].[LANGUAGE] ([DESCRIPTION]) OUTPUT INSERTED.ID INTO @INSERTED_TABLE VALUES (?);"
+											+ "SELECT @LANGUAGE_ID = ID FROM @INSERTED_TABLE;"
+											+ "SELECT @LANGUAGE_ID AS 'LANGUAGE ID';";
+									
+									lId = jdbcTemplate.queryForObject(lInsert, (rs, rowNum) -> rs.getInt("LANGUAGE ID"), constructionPracticeManager.getLanguage());
 								}
 								
-								if(constructionPracticeManager.getMechanismUtilizesSecurityTool() != null)
+								count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM [dbo].[METHOD_RELATED_LANGUAGE] WHERE [METHOD_ID] = ? AND [LANGUAGE_ID] = ?", Integer.class, mId, lId);
+								
+								if(count == 0)
 								{
-									String sInsert = "DECLARE @INSERTED_TABLE TABLE (ID INT);"
-											+ "DECLARE @SECURITY_TOOL_ID INT;"
-											+ "INSERT INTO [dbo].[SECURITY_TOOL] ([DESCRIPTION]) OUTPUT INSERTED.ID INTO @INSERTED_TABLE VALUES (?);"
-											+ "SELECT @SECURITY_TOOL_ID = ID FROM @INSERTED_TABLE;"
-											+ "SELECT @SECURITY_TOOL_ID AS 'SECURITY TOOL ID';";
-									
-									int sId = jdbcTemplate.queryForObject(sInsert, (rs, rowNum) -> rs.getInt("SECURITY TOOL ID"), constructionPracticeManager.getSecurityTool());
-									
-									rows = jdbcTemplate.update("INSERT INTO [dbo].[MECHANISM_UTILIZES_SECURITY_TOOL] ([MECHANISM_ID], [SECURITY_TOOL_ID]) VALUES (?, ?)", mechId, sId);
+									rows = jdbcTemplate.update("INSERT INTO [dbo].[METHOD_RELATED_LANGUAGE] ([METHOD_ID], [LANGUAGE_ID]) VALUES (?, ?)", mId, lId);
 									
 									if(rows != 1)
 									{
@@ -1747,21 +1816,119 @@ public class MainController {
 									}
 								}
 							}
+							
+							if(constructionPracticeManager.getHasMechanism() != null)
+							{
+								int mechId;
+								
+								try
+								{
+									mechId = jdbcTemplate.queryForObject("SELECT ID FROM [dbo].[MECHANISM] WHERE [DESCRIPTION] LIKE CAST(? AS VARCHAR(MAX))", Integer.class, constructionPracticeManager.getMechanism());
+								}
+								catch(EmptyResultDataAccessException ex)
+								{
+									String mechInsert = commonInsertStat
+											+ "DECLARE @MECHANISM_ID INT;"
+											+ "INSERT INTO [dbo].[MECHANISM] ([DESCRIPTION]) OUTPUT INSERTED.ID INTO @INSERTED_TABLE VALUES (?);"
+											+ "SELECT @MECHANISM_ID = ID FROM @INSERTED_TABLE;"
+											+ "SELECT @MECHANISM_ID AS 'MECHANISM ID';";
+									
+									mechId = jdbcTemplate.queryForObject(mechInsert, (rs, rowNum) -> rs.getInt("MECHANISM ID"), constructionPracticeManager.getMechanism());
+								}
+								
+								count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM [dbo].[METHOD_HAS_MECHANISM] WHERE [METHOD_ID] = ? AND [MECHANISM_ID] = ?", Integer.class, mId, mechId);
+								
+								if(count == 0)
+								{
+									rows = jdbcTemplate.update("INSERT INTO [dbo].[METHOD_HAS_MECHANISM] ([METHOD_ID], [MECHANISM_ID]) VALUES (?, ?)", mId, mechId);
+									
+									if(rows != 1)
+									{
+										error = true;
+									}
+								}
+								
+								if(constructionPracticeManager.getMechanismUtilizesSecurityTool() != null)
+								{
+									int sId;
+									
+									try
+									{
+										sId = jdbcTemplate.queryForObject("SELECT ID FROM [dbo].[SECURITY_TOOL]  WHERE [DESCRIPTION] LIKE CAST(? AS VARCHAR(MAX))", Integer.class, constructionPracticeManager.getSecurityTool());
+									}
+									catch(EmptyResultDataAccessException ex)
+									{
+										String sInsert = commonInsertStat
+												+ "DECLARE @SECURITY_TOOL_ID INT;"
+												+ "INSERT INTO [dbo].[SECURITY_TOOL] ([DESCRIPTION]) OUTPUT INSERTED.ID INTO @INSERTED_TABLE VALUES (?);"
+												+ "SELECT @SECURITY_TOOL_ID = ID FROM @INSERTED_TABLE;"
+												+ "SELECT @SECURITY_TOOL_ID AS 'SECURITY TOOL ID';";
+										
+										sId = jdbcTemplate.queryForObject(sInsert, (rs, rowNum) -> rs.getInt("SECURITY TOOL ID"), constructionPracticeManager.getSecurityTool());
+									}
+									
+									count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM [dbo].[MECHANISM_UTILIZES_SECURITY_TOOL] WHERE [MECHANISM_ID] = ? AND [SECURITY_TOOL_ID] = ?", Integer.class, mechId, sId);
+									
+									if(count == 0)
+									{
+										rows = jdbcTemplate.update("INSERT INTO [dbo].[MECHANISM_UTILIZES_SECURITY_TOOL] ([MECHANISM_ID], [SECURITY_TOOL_ID]) VALUES (?, ?)", mechId, sId);
+										
+										if(rows != 1)
+										{
+											error = true;
+										}
+									}
+								}
+							}
+						}
+						
+						count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM [dbo].[SOFTWARE_FEATURE_HAS_CONSTRUCTION_PRACTICE] WHERE [SOFTWARE_FEATURE_ID] = ? AND [CONSTRUCTION_PRACTICE_ID] = ?", Integer.class, constructionPracticeManager.getSoftwareFeatureId(), cpId);
+						
+						if(count == 0)
+						{
+							rows = jdbcTemplate.update("INSERT INTO [dbo].[SOFTWARE_FEATURE_HAS_CONSTRUCTION_PRACTICE] ([SOFTWARE_FEATURE_ID], [CONSTRUCTION_PRACTICE_ID]) VALUES (?, ?)", constructionPracticeManager.getSoftwareFeatureId(), cpId);
+							
+							if(rows != 1)
+							{
+								error = true;
+							}
+						}
+						
+						count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM [dbo].[SECURITY_REQUIREMENT_FOLLOWED_BY_CONSTRUCTION_PRACTICE] WHERE [SECURITY_REQUIREMENT_ID] = ? AND [CONSTRUCTION_PRACTICE_ID] = ?", Integer.class, constructionPracticeManager.getSecurityRequirementId(), cpId);
+						
+						if(count == 0)
+						{
+							rows = jdbcTemplate.update("INSERT INTO [dbo].[SECURITY_REQUIREMENT_FOLLOWED_BY_CONSTRUCTION_PRACTICE] ([SECURITY_REQUIREMENT_ID], [CONSTRUCTION_PRACTICE_ID]) VALUES (?, ?)", constructionPracticeManager.getSecurityRequirementId(), cpId);
+							
+							if(rows != 1)
+							{
+								error = true;
+							}
+						}
+						
+						count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM [dbo].[SECURITY_ERROR_MITIGATED_BY_CONSTRUCTION_PRACTICE] WHERE [SECURITY_ERROR_ID] = ? AND [CONSTRUCTION_PRACTICE_ID] = ?", Integer.class, constructionPracticeManager.getSecurityErrorId(), cpId);
+						
+						if(count == 0)
+						{
+							rows = jdbcTemplate.update("INSERT INTO [dbo].[SECURITY_ERROR_MITIGATED_BY_CONSTRUCTION_PRACTICE] ([SECURITY_ERROR_ID], [CONSTRUCTION_PRACTICE_ID]) VALUES (?, ?)", constructionPracticeManager.getSecurityErrorId(), cpId);
+							
+							if(rows != 1)
+							{
+								error = true;
+							}
+						}
+						
+						if(!error)
+						{
+							mnv.addObject(STATUS, "1");
+			    			mnv.addObject(MESSAGE, "Construction Practice inserted successfully.");
+						}
+						else
+						{
+							mnv.addObject(STATUS, "0");
+			    			mnv.addObject(MESSAGE, "An error occurred while inserting the Construction Practice.");
 						}
 					}
-				}
-				
-				
-				
-				if(!error)
-				{
-					mnv.addObject(STATUS, "1");
-	    			mnv.addObject(MESSAGE, "Construction Practice inserted successfully.");
-				}
-				else
-				{
-					mnv.addObject(STATUS, "0");
-	    			mnv.addObject(MESSAGE, "An error occurred while inserting the Construction Practice.");
 				}
 			}
 			
@@ -1798,6 +1965,325 @@ public class MainController {
         });
         
         mnv.addObject("constructionPracticeList", sfList2);
+        
+        if(constructionPracticeManager.getSelectConstructionPractice().contentEquals("E"))
+        {
+        	constructionPracticeManager.setMethodDetails("");
+        }
+		
+		return mnv;
+	}
+	
+	@RequestMapping(path = "/security-acquisition/mvp", method = {RequestMethod.GET, RequestMethod.POST})
+	public ModelAndView manageVerificationPracticeView(@ModelAttribute("verificationPracticeManager") VerificationPracticeManager verificationPracticeManager, HttpServletRequest request) {
+		
+		ModelAndView mnv = new ModelAndView("mvp");
+		
+		List<SecurityRequirement> srList = new ArrayList<>();	
+		mnv.addObject("srList", srList);
+		
+		List<SecurityError> seList = new ArrayList<>();		
+		mnv.addObject("seList", seList);
+		
+		if (request.getMethod().equals(RequestMethod.POST.name()))
+		{			
+			if(verificationPracticeManager.getSoftwareFeatureId().contentEquals("-1") || verificationPracticeManager.getSoftwareFeatureId().trim().isEmpty())
+			{
+				mnv.addObject(STATUS, "0");
+    			mnv.addObject(MESSAGE, "Select Software Feature.");
+			}
+			else if(verificationPracticeManager.getSecurityRequirementId().contentEquals("-1") || verificationPracticeManager.getSecurityRequirementId().trim().isEmpty())
+			{
+				mnv.addObject(STATUS, "0");
+    			mnv.addObject(MESSAGE, "Select Security Requirement.");
+    			
+    			verificationPracticeManager.setSoftwareFeatureId("");
+			}
+			else if(verificationPracticeManager.getSecurityErrorId().contentEquals("-1") || verificationPracticeManager.getSecurityErrorId().trim().isEmpty())
+			{
+				mnv.addObject(STATUS, "0");
+    			mnv.addObject(MESSAGE, "Select Security Error.");
+    			
+    			verificationPracticeManager.setSoftwareFeatureId("");
+    			verificationPracticeManager.setSecurityRequirementId("");
+			}
+			else
+			{				
+				if(verificationPracticeManager.getSelectVerificationPractice().contentEquals("E"))
+				{
+					if(verificationPracticeManager.getVerificationPracticeId().contentEquals("-1") || verificationPracticeManager.getVerificationPracticeId().trim().isEmpty())
+					{
+						mnv.addObject(STATUS, "0");
+		    			mnv.addObject(MESSAGE, "Select an existing Verification Practice.");
+					}
+					else
+					{
+						int rows;
+						int count;
+						
+						boolean error = false;
+						
+						count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM [dbo].[SECURITY_REQUIREMENT_FOLLOWED_BY_VERIFICATION_PRACTICE] WHERE [SECURITY_REQUIREMENT_ID] = ? AND [VERIFICATION_PRACTICE_ID] = ?", Integer.class, verificationPracticeManager.getSecurityRequirementId(), verificationPracticeManager.getVerificationPracticeId());
+						
+						if(count == 0)
+						{
+							rows = jdbcTemplate.update("INSERT INTO [dbo].[SECURITY_REQUIREMENT_FOLLOWED_BY_VERIFICATION_PRACTICE] ([SECURITY_REQUIREMENT_ID], [VERIFICATION_PRACTICE_ID]) VALUES (?, ?)", verificationPracticeManager.getSecurityRequirementId(), verificationPracticeManager.getVerificationPracticeId());
+							
+							if(rows != 1)
+							{
+								error = true;
+							}
+						}
+						
+						count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM [dbo].[SECURITY_ERROR_SPOTTED_BY_VERIFICATION_PRACTICE] WHERE [SECURITY_ERROR_ID] = ? AND [VERIFICATION_PRACTICE_ID] = ?", Integer.class, verificationPracticeManager.getSecurityErrorId(), verificationPracticeManager.getVerificationPracticeId());
+
+						if(count == 0)
+						{
+							rows = jdbcTemplate.update("INSERT INTO [dbo].[SECURITY_ERROR_SPOTTED_BY_VERIFICATION_PRACTICE] ([SECURITY_ERROR_ID], [VERIFICATION_PRACTICE_ID]) VALUES (?, ?)", verificationPracticeManager.getSecurityErrorId(), verificationPracticeManager.getVerificationPracticeId());
+							
+							if(rows != 1)
+							{
+								error = true;
+							}
+						}
+						
+						if(!error)
+						{
+							mnv.addObject(STATUS, "1");
+			    			mnv.addObject(MESSAGE, "Verification Practice inserted successfully.");
+						}
+						else
+						{
+							mnv.addObject(STATUS, "0");
+			    			mnv.addObject(MESSAGE, "An error occurred while inserting the Verification Practice.");
+						}
+					}
+				}
+				else if(verificationPracticeManager.getSelectVerificationPractice().contentEquals("N"))
+				{
+					if(verificationPracticeManager.getVerificationPracticeDescription().trim().isEmpty())
+					{
+						mnv.addObject(STATUS, "0");
+		    			mnv.addObject(MESSAGE, "Verification Practice description may not be empty.");
+					}
+					else if(verificationPracticeManager.getHasApproach() == null && verificationPracticeManager.getHasTechnique() == null)
+					{
+						mnv.addObject(STATUS, "0");
+		    			mnv.addObject(MESSAGE, "Either an approach and/or a technique should be provided.");
+					}
+					else if(verificationPracticeManager.getHasApproach() != null && verificationPracticeManager.getApproachDescription().trim().isEmpty())
+					{
+						mnv.addObject(STATUS, "0");
+		    			mnv.addObject(MESSAGE, "Approach description may not be empty.");
+					}
+					else if(verificationPracticeManager.getHasTechnique() != null && (verificationPracticeManager.getTechniqueDetails().trim().isEmpty()))
+					{
+						mnv.addObject(STATUS, "0");
+		    			mnv.addObject(MESSAGE, "Technique details may not be empty.");
+					}
+					else if(verificationPracticeManager.getHasSecurityTool() != null && verificationPracticeManager.getSecurityTool().trim().isEmpty())
+					{
+						mnv.addObject(STATUS, "0");
+		    			mnv.addObject(MESSAGE, "Security Tool may not be empty.");
+					}
+					else
+					{
+						boolean error = false;
+						
+						int rows;
+						int count;
+						
+						int vpId;
+						
+						String commonInsertStat = "DECLARE @INSERTED_TABLE TABLE (ID INT);";
+						
+						try
+						{
+							vpId = jdbcTemplate.queryForObject("SELECT ID FROM [dbo].[VERIFICATION_PRACTICE] WHERE [DESCRIPTION] LIKE CAST(? AS VARCHAR(MAX))", Integer.class, verificationPracticeManager.getVerificationPracticeDescription());
+						}
+						catch(EmptyResultDataAccessException ex)
+						{
+							String vpInsert = commonInsertStat
+									+ "DECLARE @VERIFICATION_PRACTICE_ID INT;"
+									+ "INSERT INTO [dbo].[VERIFICATION_PRACTICE] ([DESCRIPTION]) OUTPUT INSERTED.ID INTO @INSERTED_TABLE VALUES (?);"
+									+ "SELECT @VERIFICATION_PRACTICE_ID = ID FROM @INSERTED_TABLE;"
+									+ "SELECT @VERIFICATION_PRACTICE_ID AS 'VERIFICATION PRACTICE ID';";
+					
+							vpId = jdbcTemplate.queryForObject(vpInsert, (rs, rowNum) -> rs.getInt("VERIFICATION PRACTICE ID"), verificationPracticeManager.getVerificationPracticeDescription());
+						}
+						
+						if(verificationPracticeManager.getHasApproach() != null)
+						{
+							int haId;
+							
+							try
+							{
+								haId = jdbcTemplate.queryForObject("SELECT ID FROM [dbo].[APPROACH] WHERE [DESCRIPTION] LIKE CAST(? AS VARCHAR(MAX))", Integer.class, verificationPracticeManager.getApproachDescription());
+							}
+							catch(EmptyResultDataAccessException ex)
+							{
+								String haInsert = commonInsertStat
+										+ "DECLARE @APPROACH_ID INT;"
+										+ "INSERT INTO [dbo].[APPROACH] ([DESCRIPTION]) OUTPUT INSERTED.ID INTO @INSERTED_TABLE VALUES (?);"
+										+ "SELECT @APPROACH_ID = ID FROM @INSERTED_TABLE;"
+										+ "SELECT @APPROACH_ID AS 'APPROACH ID';";
+								
+								haId = jdbcTemplate.queryForObject(haInsert, (rs, rowNum) -> rs.getInt("APPROACH ID"), verificationPracticeManager.getApproachDescription());
+							}
+							
+							count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM [dbo].[VERIFICATION_PRACTICE_HAS_APPROACH] WHERE [VERIFICATION_PRACTICE_ID] = ? AND [APPROACH_ID] = ?", Integer.class, vpId, haId);
+
+							if(count == 0)
+							{
+								rows = jdbcTemplate.update("INSERT INTO [dbo].[VERIFICATION_PRACTICE_HAS_APPROACH] ([VERIFICATION_PRACTICE_ID], [APPROACH_ID]) VALUES (?, ?)", vpId, haId);
+								
+								if(rows != 1)
+								{
+									error = true;
+								}
+							}
+						}
+						
+						if(verificationPracticeManager.getHasTechnique() != null)
+						{
+							int tId;
+							
+							try
+							{
+								tId = jdbcTemplate.queryForObject("SELECT ID FROM [dbo].[TECHNIQUE] WHERE DESCRIPTION LIKE CAST(? AS VARCHAR(MAX))", Integer.class, verificationPracticeManager.getTechniqueDetails());
+							}
+							catch(EmptyResultDataAccessException ex)
+							{
+								String tInsert = commonInsertStat
+										+ "DECLARE @TECHNIQUE_ID INT;"
+										+ "INSERT INTO [dbo].[TECHNIQUE] ([DESCRIPTION]) OUTPUT INSERTED.ID INTO @INSERTED_TABLE VALUES (?);"
+										+ "SELECT @TECHNIQUE_ID = ID FROM @INSERTED_TABLE;" 
+										+ "SELECT @TECHNIQUE_ID AS 'TECHNIQUE ID';";
+								
+								tId = jdbcTemplate.queryForObject(tInsert, (rs, rowNum) -> rs.getInt("TECHNIQUE ID"), verificationPracticeManager.getTechniqueDetails());
+							}
+							
+							count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM [dbo].[VERIFICATION_PRACTICE_HAS_TECHNIQUE] WHERE [VERIFICATION_PRACTICE_ID] = ? AND [TECHNIQUE_ID] = ?", Integer.class, vpId, tId);
+
+							if(count == 0)
+							{
+								rows = jdbcTemplate.update("INSERT INTO [dbo].[VERIFICATION_PRACTICE_HAS_TECHNIQUE] ([VERIFICATION_PRACTICE_ID], [TECHNIQUE_ID]) VALUES (?, ?)", vpId, tId);
+								
+								if(rows != 1)
+								{
+									error = true;
+								}
+							}
+							
+							if(verificationPracticeManager.getHasSecurityTool() != null)
+							{
+								int stId;
+								
+								try
+								{
+									stId = jdbcTemplate.queryForObject("SELECT ID FROM [dbo].[SECURITY_TOOL] WHERE [DESCRIPTION] LIKE CAST(? AS VARCHAR(MAX))", Integer.class, verificationPracticeManager.getSecurityTool());
+								}
+								catch(EmptyResultDataAccessException ex)
+								{
+									String lInsert = commonInsertStat
+											+ "DECLARE @SECURITY_TOOL_ID INT;"
+											+ "INSERT INTO [dbo].[SECURITY_TOOL] ([DESCRIPTION]) OUTPUT INSERTED.ID INTO @INSERTED_TABLE VALUES (?);"
+											+ "SELECT @SECURITY_TOOL_ID = ID FROM @INSERTED_TABLE;"
+											+ "SELECT @SECURITY_TOOL_ID AS 'SECURITY TOOL ID';";
+									
+									stId = jdbcTemplate.queryForObject(lInsert, (rs, rowNum) -> rs.getInt("SECURITY TOOL ID"), verificationPracticeManager.getSecurityTool());
+								}
+								
+								count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM [dbo].[TECHNIQUE_HAS_SECURITY_TOOL] WHERE [TECHNIQUE_ID] = ? AND [SECURITY_TOOL_ID] = ?", Integer.class, tId, stId);
+								
+								if(count == 0)
+								{
+									rows = jdbcTemplate.update("INSERT INTO [dbo].[TECHNIQUE_HAS_SECURITY_TOOL] ([TECHNIQUE_ID], [SECURITY_TOOL_ID]) VALUES (?, ?)", tId, stId);
+									
+									if(rows != 1)
+									{
+										error = true;
+									}
+								}
+							}
+						}
+						
+						count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM [dbo].[SECURITY_REQUIREMENT_FOLLOWED_BY_VERIFICATION_PRACTICE] WHERE [SECURITY_REQUIREMENT_ID] = ? AND [VERIFICATION_PRACTICE_ID] = ?", Integer.class, verificationPracticeManager.getSecurityRequirementId(), vpId);
+						
+						if(count == 0)
+						{
+							rows = jdbcTemplate.update("INSERT INTO [dbo].[SECURITY_REQUIREMENT_FOLLOWED_BY_VERIFICATION_PRACTICE] ([SECURITY_REQUIREMENT_ID], [VERIFICATION_PRACTICE_ID]) VALUES (?, ?)", verificationPracticeManager.getSecurityRequirementId(), vpId);
+							
+							if(rows != 1)
+							{
+								error = true;
+							}
+						}
+						
+						count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM [dbo].[SECURITY_ERROR_SPOTTED_BY_VERIFICATION_PRACTICE] WHERE [SECURITY_ERROR_ID] = ? AND [VERIFICATION_PRACTICE_ID] = ?", Integer.class, verificationPracticeManager.getSecurityErrorId(), vpId);
+						
+						if(count == 0)
+						{
+							rows = jdbcTemplate.update("INSERT INTO [dbo].[SECURITY_ERROR_SPOTTED_BY_VERIFICATION_PRACTICE] ([SECURITY_ERROR_ID], [VERIFICATION_PRACTICE_ID]) VALUES (?, ?)", verificationPracticeManager.getSecurityErrorId(), vpId);
+							
+							if(rows != 1)
+							{
+								error = true;
+							}
+						}
+						
+						if(!error)
+						{
+							mnv.addObject(STATUS, "1");
+			    			mnv.addObject(MESSAGE, "Verification Practice inserted successfully.");
+						}
+						else
+						{
+							mnv.addObject(STATUS, "0");
+			    			mnv.addObject(MESSAGE, "An error occurred while inserting the Verification Practice.");
+						}
+					}
+				}
+			}
+			
+			if(!verificationPracticeManager.getSoftwareFeatureId().contentEquals("-1") && !verificationPracticeManager.getSoftwareFeatureId().trim().isEmpty())
+			{
+				srList = getSecurityRequirementsList(verificationPracticeManager.getSoftwareFeatureId());
+				
+				mnv.addObject("srList", srList);
+			}
+			
+			if(!verificationPracticeManager.getSecurityRequirementId().contentEquals("-1") && !verificationPracticeManager.getSecurityRequirementId().trim().isEmpty())
+			{
+				seList = getSecurityErrorsList(verificationPracticeManager.getSecurityRequirementId());
+				
+				mnv.addObject("seList", seList);
+			}
+		}
+		
+		List<Map<String,Object>> list = jdbcTemplate.queryForList("SELECT [ID], [DESCRIPTION] FROM [SSKMS].[dbo].[SOFTWARE_FEATURE]");        
+        List<SoftwareFeature> sfList = new ArrayList<>();        
+        list.forEach(m -> {               
+        	SoftwareFeature sf = new SoftwareFeature((int) m.get("ID"), (String) m.get("DESCRIPTION"));
+        	sfList.add(sf);               
+        });
+        
+        mnv.addObject("softwareFeatureList", sfList);
+        
+        List<Map<String,Object>> list2 = jdbcTemplate.queryForList("SELECT [ID],[DESCRIPTION] FROM [SSKMS].[dbo].[VERIFICATION_PRACTICE]");
+        
+        List<VerificationPractice> sfList2 = new ArrayList<>();        
+        list2.forEach(m -> {               
+        	VerificationPractice vp = new VerificationPractice((int) m.get("ID"), (String) m.get("DESCRIPTION"));
+        	sfList2.add(vp);               
+        });
+        
+        mnv.addObject("verificationPracticeList", sfList2);
+        
+        if(verificationPracticeManager.getSelectVerificationPractice().contentEquals("E"))
+        {
+        	verificationPracticeManager.setTechniqueDetails("");
+        }
 		
 		return mnv;
 	}
@@ -1834,11 +2320,6 @@ public class MainController {
         });
         
 	    return seList;
-	}
-
-	@GetMapping(path = "/security-acquisition/mvp")
-	public ModelAndView manageVerificationPracticeView() {
-		return new ModelAndView("mvp");
 	}
 
 	private static String getSparqlHeader() {
