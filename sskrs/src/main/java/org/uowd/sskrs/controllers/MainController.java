@@ -1,6 +1,7 @@
 package org.uowd.sskrs.controllers;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -141,7 +142,7 @@ public class MainController {
 
 			List<Map<String,Object>> list3 = jdbcTemplate.queryForList("SELECT SF.DESCRIPTION AS 'SOFTWARE FEATURE', SR.DESCRIPTION AS 'SECURITY REQUIREMENT', "
 					+ "SE.DESCRIPTION AS 'SECURITY ERROR', SW.DESCRIPTION AS 'VULNERABILITY', " 
-					+ "CP.DESCRIPTION AS 'CONSTRUCTION PRACTICE' " 
+					+ "CP.DESCRIPTION AS 'CONSTRUCTION PRACTICE', CP.ID AS 'CONSTRUCTION ID' " 
 					+ "FROM SOFTWARE_FEATURE AS SF "
 					+ "INNER JOIN SOFTWARE_PARADIGM_HAS_SOFTWARE_FEATURE SPHSF ON SPHSF.SOFTWARE_FEATURE_ID = SF.ID "
 					+ "INNER JOIN SUBJECT_AREA_HAS_SOFTWARE_FEATURE SAHSF ON SAHSF.SOFTWARE_FEATURE_ID = SF.ID "
@@ -164,7 +165,7 @@ public class MainController {
 				result.append("<td>").append(m.get("SECURITY ERROR")).append("</td>");
 				result.append("<td>").append(m.get("VULNERABILITY")).append("</td>");
 				result.append("<td>").append(m.get("CONSTRUCTION PRACTICE")).append("</td>");
-				result.append("<td><a target=\"_blank\" href=\"").append("https://www.google.com").append("\">View</a></td>");
+				result.append("<td><a target=\"_blank\" href=\"").append("/sskrs/view-practice?type=construction&id=").append(m.get("CONSTRUCTION ID")).append("\">View</a></td>");
 				result.append("</tr>");
 	        });
 		
@@ -203,7 +204,7 @@ public class MainController {
 
 			List<Map<String,Object>> list3 = jdbcTemplate.queryForList("SELECT SF.DESCRIPTION AS 'SOFTWARE FEATURE', SR.DESCRIPTION AS 'SECURITY REQUIREMENT', "
 					+ "SE.DESCRIPTION AS 'SECURITY ERROR', SW.DESCRIPTION AS 'VULNERABILITY', " 
-					+ "VP.DESCRIPTION AS 'VERIFICATION PRACTICE' " 
+					+ "VP.DESCRIPTION AS 'VERIFICATION PRACTICE', VP.ID AS 'VERIFICATION ID' " 
 					+ "FROM SOFTWARE_FEATURE AS SF "
 					+ "INNER JOIN SOFTWARE_PARADIGM_HAS_SOFTWARE_FEATURE SPHSF ON SPHSF.SOFTWARE_FEATURE_ID = SF.ID "
 					+ "INNER JOIN SUBJECT_AREA_HAS_SOFTWARE_FEATURE SAHSF ON SAHSF.SOFTWARE_FEATURE_ID = SF.ID "
@@ -225,7 +226,7 @@ public class MainController {
 				result.append("<td>").append(m.get("SECURITY ERROR")).append("</td>");
 				result.append("<td>").append(m.get("VULNERABILITY")).append("</td>");
 				result.append("<td>").append(m.get("VERIFICATION PRACTICE")).append("</td>");
-				result.append("<td><a target=\"_blank\" href=\"").append("https://www.google.com").append("\">View</a></td>");
+				result.append("<td><a target=\"_blank\" href=\"").append("/sskrs/view-practice?type=verification&id=").append(m.get("VERIFICATION ID")).append("\">View</a></td>");
 				result.append("</tr>");
 	        });
 
@@ -233,6 +234,142 @@ public class MainController {
 		}
 
 		return mv;
+	}
+	
+	@GetMapping(path = "/view-practice")
+	public ModelAndView viewPractice(@RequestParam(name = "type", required = true) String type, 
+			@RequestParam(name = "id", required = true) String id) {
+				
+		ModelAndView mnv = new ModelAndView("view-practice");
+		
+		String tableName = "CONSTRUCTION_PRACTICE";
+		
+		if(type.equalsIgnoreCase("verification"))
+			tableName = "VERIFICATION_PRACTICE";
+		
+		String practiceDescription = jdbcTemplate.queryForObject("SELECT DESCRIPTION FROM " + tableName + " WHERE ID = ?", String.class, id);		
+		mnv.addObject("description", practiceDescription);
+		
+		if(type.equalsIgnoreCase("verification"))
+		{
+			List<Map<String,Object>> list = jdbcTemplate.queryForList("SELECT VP.DESCRIPTION 'VERIFICATION PRACTICE', SR.DESCRIPTION 'SECURITY REQUIREMENT', "
+					+ "SF.DESCRIPTION 'SOFTWARE FEATURE', SE.DESCRIPTION 'SECURITY ERROR', "
+					+ "SW.DESCRIPTION 'SOFTWARE WEAKNESS' "
+					+ "FROM VERIFICATION_PRACTICE VP "
+					+ "INNER JOIN SECURITY_REQUIREMENT_FOLLOWED_BY_VERIFICATION_PRACTICE SRFBVP ON SRFBVP.VERIFICATION_PRACTICE_ID = VP.ID "
+					+ "INNER JOIN SECURITY_REQUIREMENT SR ON SR.ID = SRFBVP.SECURITY_REQUIREMENT_ID "
+					+ "INNER JOIN SOFTWARE_FEATURE_HAS_SECURITY_REQUIREMENT SFHSR ON SFHSR.SECURITY_REQUIREMENT_ID = SR.ID "
+					+ "INNER JOIN SOFTWARE_FEATURE SF ON SF.ID = SFHSR.SOFTWARE_FEATURE_ID "
+					+ "INNER JOIN SECURITY_ERROR_SPOTTED_BY_VERIFICATION_PRACTICE SESBVP ON SESBVP.VERIFICATION_PRACTICE_ID = VP.ID "
+					+ "INNER JOIN SECURITY_ERROR SE ON SE.ID = SESBVP.SECURITY_ERROR_ID "
+					+ "INNER JOIN SECURITY_ERROR_CAUSES_SOFTWARE_WEAKNESS SECSW ON SECSW.SECURITY_ERROR_ID = SE.ID "
+					+ "INNER JOIN SOFTWARE_WEAKNESS SW ON SW.ID = SECSW.SOFTWARE_WEAKNESS_ID "
+					+ "WHERE VP.ID = ?", id);
+			
+	        List<HashMap<String, Object>> vpList = new ArrayList<>();
+	        
+	        list.forEach(m -> {               
+	        	HashMap<String, Object> vpMap = new HashMap<>();
+	        	vpMap.put("VERIFICATION PRACTICE", m.get("VERIFICATION PRACTICE"));
+	        	vpMap.put("SECURITY REQUIREMENT", m.get("SECURITY REQUIREMENT"));
+	        	vpMap.put("SOFTWARE FEATURE", m.get("SOFTWARE FEATURE"));
+	        	vpMap.put("SECURITY ERROR", m.get("SECURITY ERROR"));
+	        	vpMap.put("SOFTWARE WEAKNESS", m.get("SOFTWARE WEAKNESS"));
+	        	
+	        	vpList.add(vpMap);
+	        });
+	        
+	        mnv.addObject("vpList", vpList);
+	        
+	        list = jdbcTemplate.queryForList("SELECT VP.DESCRIPTION 'VERIFICATION PRACTICE', A.DESCRIPTION 'APPROACH', "
+	        		+ "T.DESCRIPTION 'TECHNIQUE', ST.DESCRIPTION 'SECURITY TOOL' "
+	        		+ "FROM VERIFICATION_PRACTICE VP "
+	        		+ "LEFT JOIN VERIFICATION_PRACTICE_HAS_APPROACH VPHA ON VPHA.VERIFICATION_PRACTICE_ID = VP.ID "
+	        		+ "LEFT JOIN APPROACH A ON A.ID = VPHA.APPROACH_ID "
+	        		+ "LEFT JOIN VERIFICATION_PRACTICE_HAS_TECHNIQUE VPHT ON VPHT.VERIFICATION_PRACTICE_ID = VP.ID "
+	        		+ "LEFT JOIN TECHNIQUE T ON T.ID = VPHT.TECHNIQUE_ID "
+	        		+ "LEFT JOIN TECHNIQUE_HAS_SECURITY_TOOL THST ON THST.TECHNIQUE_ID = T.ID "
+	        		+ "LEFT JOIN SECURITY_TOOL ST ON ST.ID = THST.SECURITY_TOOL_ID "
+	        		+ "WHERE VP.ID = ?", id);
+			
+	        List<HashMap<String, Object>> vList = new ArrayList<>();
+	        
+	        list.forEach(m -> {               
+	        	HashMap<String, Object> vMap = new HashMap<>();
+	        	vMap.put("VERIFICATION PRACTICE", m.get("VERIFICATION PRACTICE"));
+	        	vMap.put("APPROACH", m.get("APPROACH"));
+	        	vMap.put("TECHNIQUE", m.get("TECHNIQUE"));
+	        	vMap.put("SECURITY TOOL", m.get("SECURITY TOOL"));
+	        	
+	        	vList.add(vMap);
+	        });
+	        
+	        mnv.addObject("vList", vList);
+		}
+		else
+		{
+			List<Map<String,Object>> list = jdbcTemplate.queryForList("SELECT CP.DESCRIPTION 'CONSTRUCTION PRACTICE', SF.DESCRIPTION 'SOFTWARE FEATURE', "
+					+ "SR.DESCRIPTION 'SECURITY REQUIREMENT', SE.DESCRIPTION 'SECURITY ERROR', SW.DESCRIPTION 'SOFTWARE WEAKNESS' "
+					+ "FROM CONSTRUCTION_PRACTICE CP "
+					+ "INNER JOIN SOFTWARE_FEATURE_HAS_CONSTRUCTION_PRACTICE SFHCP ON SFHCP.CONSTRUCTION_PRACTICE_ID = CP.ID "
+					+ "INNER JOIN SOFTWARE_FEATURE SF ON SF.ID = SFHCP.SOFTWARE_FEATURE_ID "
+					+ "INNER JOIN SECURITY_REQUIREMENT_FOLLOWED_BY_CONSTRUCTION_PRACTICE SRFCP ON SRFCP.CONSTRUCTION_PRACTICE_ID = CP.ID "
+					+ "INNER JOIN SECURITY_REQUIREMENT SR ON SR.ID = SRFCP.SECURITY_REQUIREMENT_ID "
+					+ "INNER JOIN SECURITY_ERROR_MITIGATED_BY_CONSTRUCTION_PRACTICE SEMBCP ON SEMBCP.CONSTRUCTION_PRACTICE_ID = CP.ID "
+					+ "INNER JOIN SECURITY_ERROR SE ON SE.ID = SEMBCP.SECURITY_ERROR_ID "
+					+ "INNER JOIN SECURITY_ERROR_CAUSES_SOFTWARE_WEAKNESS SECSW ON SECSW.SECURITY_ERROR_ID = SEMBCP.SECURITY_ERROR_ID "
+					+ "INNER JOIN SOFTWARE_WEAKNESS SW ON SW.ID = SECSW.SOFTWARE_WEAKNESS_ID "
+					+ "WHERE CP.ID = ?", id);
+			
+	        List<HashMap<String, Object>> cpList = new ArrayList<>();
+	        
+	        list.forEach(m -> {               
+	        	HashMap<String, Object> cpMap = new HashMap<>();
+	        	cpMap.put("CONSTRUCTION PRACTICE", m.get("CONSTRUCTION PRACTICE"));
+	        	cpMap.put("SOFTWARE FEATURE", m.get("SOFTWARE FEATURE"));
+	        	cpMap.put("SECURITY REQUIREMENT", m.get("SECURITY REQUIREMENT"));
+	        	cpMap.put("SECURITY ERROR", m.get("SECURITY ERROR"));
+	        	cpMap.put("SOFTWARE WEAKNESS", m.get("SOFTWARE WEAKNESS"));
+	        	
+	        	cpList.add(cpMap);
+	        });
+	        
+	        mnv.addObject("cpList", cpList);
+	        
+	        list = jdbcTemplate.queryForList("SELECT CP.DESCRIPTION 'CONSTRUCTION PRACTICE', S.DESCRIPTION 'STRATEGY', " 
+	        		+ "M.DESCRIPTION 'METHOD', L.DESCRIPTION 'LANGUAGE', "
+	        		+ "MC.DESCRIPTION 'MECHANISM', ST.DESCRIPTION 'SECURITY TOOL' "
+	        		+ "FROM CONSTRUCTION_PRACTICE CP "
+	        		+ "LEFT JOIN CONSTRUCTION_PRACTICE_FOLLOWS_STRATEGY CPFS ON CPFS.CONSTRUCTION_PRACTICE_ID = CP.ID "
+	        		+ "LEFT JOIN STRATEGY S ON S.ID = CPFS.STRATEGY_ID "
+	        		+ "LEFT JOIN CONSTRUCTION_PRACTICE_HAS_METHOD CPHM ON CPHM.CONSTRUCTION_PRACTICE_ID = CP.ID "
+	        		+ "LEFT JOIN METHOD M ON M.ID = CPHM.METHOD_ID "
+	        		+ "LEFT JOIN METHOD_RELATED_LANGUAGE MRL ON MRL.METHOD_ID = M.ID "
+	        		+ "LEFT JOIN LANGUAGE L ON L.ID = MRL.LANGUAGE_ID "
+	        		+ "LEFT JOIN METHOD_HAS_MECHANISM MHM ON MHM.METHOD_ID = M.ID "
+	        		+ "LEFT JOIN MECHANISM MC ON MC.ID = MHM.MECHANISM_ID "
+	        		+ "LEFT JOIN MECHANISM_UTILIZES_SECURITY_TOOL MUST ON MUST.MECHANISM_ID = MC.ID "
+	        		+ "LEFT JOIN SECURITY_TOOL ST ON ST.ID = MUST.SECURITY_TOOL_ID "
+	        		+ "WHERE CP.ID = ?", id);
+			
+	        List<HashMap<String, Object>> pList = new ArrayList<>();
+	        
+	        list.forEach(m -> {               
+	        	HashMap<String, Object> pMap = new HashMap<>();
+	        	pMap.put("CONSTRUCTION PRACTICE", m.get("CONSTRUCTION PRACTICE"));
+	        	pMap.put("STRATEGY", m.get("STRATEGY"));
+	        	pMap.put("METHOD", m.get("METHOD"));
+	        	pMap.put("LANGUAGE", m.get("LANGUAGE"));
+	        	pMap.put("MECHANISM", m.get("MECHANISM"));
+	        	pMap.put("SECURITY TOOL", m.get("SECURITY TOOL"));
+	        	
+	        	pList.add(pMap);
+	        });
+	        
+	        mnv.addObject("pList", pList);
+		}
+		
+		return mnv;
 	}
 
 	@GetMapping(path = "/security-acquisition")
@@ -1403,20 +1540,13 @@ public class MainController {
 						{
 							int mId;
 							
-							try
-							{
-								mId = jdbcTemplate.queryForObject("SELECT ID FROM [dbo].[METHOD] WHERE DESCRIPTION LIKE CAST(? AS VARCHAR(MAX))", Integer.class, constructionPracticeManager.getMethodDetails());
-							}
-							catch(EmptyResultDataAccessException ex)
-							{
-								String mInsert = commonInsertStat
-										+ "DECLARE @METHOD_ID INT;"
-										+ "INSERT INTO [dbo].[METHOD] ([DESCRIPTION]) OUTPUT INSERTED.ID INTO @INSERTED_TABLE VALUES (?);"
-										+ "SELECT @METHOD_ID = ID FROM @INSERTED_TABLE;" 
-										+ "SELECT @METHOD_ID AS 'METHOD ID';";
-								
-								mId = jdbcTemplate.queryForObject(mInsert, (rs, rowNum) -> rs.getInt("METHOD ID"), constructionPracticeManager.getMethodDetails());
-							}
+							String mInsert = commonInsertStat
+									+ "DECLARE @METHOD_ID INT;"
+									+ "INSERT INTO [dbo].[METHOD] ([DESCRIPTION]) OUTPUT INSERTED.ID INTO @INSERTED_TABLE VALUES (?);"
+									+ "SELECT @METHOD_ID = ID FROM @INSERTED_TABLE;" 
+									+ "SELECT @METHOD_ID AS 'METHOD ID';";
+							
+							mId = jdbcTemplate.queryForObject(mInsert, (rs, rowNum) -> rs.getInt("METHOD ID"), constructionPracticeManager.getMethodDetails());
 							
 							count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM [dbo].[CONSTRUCTION_PRACTICE_HAS_METHOD] WHERE [CONSTRUCTION_PRACTICE_ID] = ? AND [METHOD_ID] = ?", Integer.class, cpId, mId);
 
@@ -1793,20 +1923,13 @@ public class MainController {
 						{
 							int tId;
 							
-							try
-							{
-								tId = jdbcTemplate.queryForObject("SELECT ID FROM [dbo].[TECHNIQUE] WHERE DESCRIPTION LIKE CAST(? AS VARCHAR(MAX))", Integer.class, verificationPracticeManager.getTechniqueDetails());
-							}
-							catch(EmptyResultDataAccessException ex)
-							{
-								String tInsert = commonInsertStat
-										+ "DECLARE @TECHNIQUE_ID INT;"
-										+ "INSERT INTO [dbo].[TECHNIQUE] ([DESCRIPTION]) OUTPUT INSERTED.ID INTO @INSERTED_TABLE VALUES (?);"
-										+ "SELECT @TECHNIQUE_ID = ID FROM @INSERTED_TABLE;" 
-										+ "SELECT @TECHNIQUE_ID AS 'TECHNIQUE ID';";
-								
-								tId = jdbcTemplate.queryForObject(tInsert, (rs, rowNum) -> rs.getInt("TECHNIQUE ID"), verificationPracticeManager.getTechniqueDetails());
-							}
+							String tInsert = commonInsertStat
+									+ "DECLARE @TECHNIQUE_ID INT;"
+									+ "INSERT INTO [dbo].[TECHNIQUE] ([DESCRIPTION]) OUTPUT INSERTED.ID INTO @INSERTED_TABLE VALUES (?);"
+									+ "SELECT @TECHNIQUE_ID = ID FROM @INSERTED_TABLE;" 
+									+ "SELECT @TECHNIQUE_ID AS 'TECHNIQUE ID';";
+							
+							tId = jdbcTemplate.queryForObject(tInsert, (rs, rowNum) -> rs.getInt("TECHNIQUE ID"), verificationPracticeManager.getTechniqueDetails());
 							
 							count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM [dbo].[VERIFICATION_PRACTICE_HAS_TECHNIQUE] WHERE [VERIFICATION_PRACTICE_ID] = ? AND [TECHNIQUE_ID] = ?", Integer.class, vpId, tId);
 
